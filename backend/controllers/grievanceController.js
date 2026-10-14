@@ -1,645 +1,393 @@
-const { db } = require('../config/db');
+const Grievance = require('../models/Grievance');
+const Department = require('../models/Department');
+const Notification = require('../models/Notification');
+const AuditLog = require('../models/AuditLog');
+const { classifyGrievance } = require('../services/aiClassifier');
 
-// 1. Submit a Grievance
-function submit(req, res) {
-  const { title, description, subcategoryId, priority, address, city, district, state, pincode, latitude, longitude, isPrivate } = req.body;
-
-  if (!title || !description || !subcategoryId || !priority) {
-    return res.status(400).json({ error: 'Title, description, subcategory, and priority are required.' });
-  }
-
+// Helper: create notification
+async function createNotification(recipientId, type, title, message, grievanceId = null, link = null) {
   try {
-    // Generate Unique Grievance ID: GRV-YYYY-XXXXXX
-    const currentYear = new Date().getFullYear();
-    const yearPattern = `GRV-${currentYear}-%`;
-    const countRow = db.prepare('SELECT COUNT(*) as count FROM grievances WHERE id LIKE ?').get(yearPattern);
-    const sequenceNum = (countRow.count + 1).toString().padStart(6, '0');
-    const grievanceId = `GRV-${currentYear}-${sequenceNum}`;
+    await Notification.create({ recipient: recipientId, type, title, message, grievance: grievanceId, link });
+  } catch (e) {
+    console.error('[Notif] Error creating notification:', e.message);
+  }
+}
 
-    // Get subcategory details to find responsible department and SLA days
-    const subcat = db.prepare('SELECT department_id, sla_days FROM subcategories WHERE id = ?').get(subcategoryId);
-    
-    if (!subcat) {
-      return res.status(400).json({ error: 'Selected subcategory is invalid.' });
+// Helper: compute SLA deadline
+function computeSlaDeadline(priority, department) {
+  const hours = department?.slaConfig?.[priority] || 72;
+  const deadline = new Date();
+  deadline.setHours(deadline.getHours() + hours);
+  return deadline;
+}
+
+// POST /api/grievances - Submit a new grievance
+exports.submitGrievance = async (req, res) => {
+  try {
+    const { title, description, category, subcategory, isAnonymous, tags } = req.body;
+
+    if (!title || !description) {
+      return res.status(400).json({ error: 'Title and description are required.' });
     }
 
-    const departmentId = subcat.department_id;
-    const slaDays = subcat.sla_days || 7;
-    
-    // Calculate SLA Deadline
-    const now = new Date();
-    const slaDeadline = new Date(now.getTime() + slaDays * 24 * 60 * 60 * 1000).toISOString();
-    const createdAt = now.toISOString();
+    // AI Classification
+    const aiResult = await classifyGrievance(description + ' ' + title);
 
-    // Insert Grievance
-    const insertStmt = db.prepare(`
-      INSERT INTO grievances (
-        id, title, description, citizen_id, subcategory_id, department_id, 
-        priority, status, address, city, district, state, pincode, 
-        latitude, longitude, is_private, sla_deadline, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'SUBMITTED', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
+    // Find department from AI result or category
+    const departmentName = aiResult.department;
+    const dept = await Department.findOne({ name: departmentName });
 
-    insertStmt.run(
-      grievanceId,
+    // Handle file attachments
+    const attachments = req.files?.map(f => ({
+      filename: f.filename,
+      originalName: f.originalname,
+      mimetype: f.mimetype,
+      size: f.size
+    })) || [];
+
+    const grievance = await Grievance.create({
       title,
       description,
-      req.user.id,
-      subcategoryId,
-      departmentId || null,
-      priority,
-      address || null,
-      city || null,
-      district || null,
-      state || null,
-      pincode || null,
-      latitude ? parseFloat(latitude) : null,
-      longitude ? parseFloat(longitude) : null,
-      isPrivate ? 1 : 0,
-      slaDeadline,
-      createdAt,
-      createdAt
-    );
-
-    // Write initial history record
-    db.prepare(`
-      INSERT INTO grievance_history (grievance_id, previous_status, new_status, changed_by, remarks, timestamp)
-      VALUES (?, NULL, 'SUBMITTED', ?, 'Grievance submitted by citizen.', ?)
-    `).run(grievanceId, req.user.id, createdAt);
-
-    // Log action
-    db.prepare(`
-      INSERT INTO audit_logs (user_id, action, entity_type, entity_id, metadata)
-      VALUES (?, 'CREATE_GRIEVANCE', 'grievance', ?, ?)
-    `).run(req.user.id, grievanceId, JSON.stringify({ title, departmentId }));
-
-    // Send notifications to admins
-    const admins = db.prepare("SELECT id FROM users WHERE role = 'admin'").all();
-    const insertNotif = db.prepare(`
-      INSERT INTO notifications (user_id, grievance_id, message)
-      VALUES (?, ?, ?)
-    `);
-    
-    admins.forEach(admin => {
-      insertNotif.run(admin.id, grievanceId, `New grievance ${grievanceId} submitted: "${title}"`);
-    });
-
-    res.status(211).json({
-      message: 'Grievance submitted successfully!',
-      grievanceId,
-      expectedResolution: new Date(slaDeadline).toLocaleDateString(),
-      departmentId
-    });
-  } catch (error) {
-    console.error('Submit grievance error:', error);
-    res.status(500).json({ error: 'Server error submitting grievance.' });
-  }
-}
-
-// 2. List Grievances
-function list(req, res) {
-  const { status, priority, categoryId, departmentId, search, isBreached } = req.query;
-
-  try {
-    let query = `
-      SELECT g.*, 
-             s.name as subcategory_name, 
-             c.name as category_name, 
-             d.name as department_name, 
-             u.name as citizen_name,
-             o_u.name as officer_name
-      FROM grievances g
-      LEFT JOIN subcategories s ON g.subcategory_id = s.id
-      LEFT JOIN categories c ON s.category_id = c.id
-      LEFT JOIN departments d ON g.department_id = d.id
-      LEFT JOIN users u ON g.citizen_id = u.id
-      LEFT JOIN officers o ON g.assigned_officer_id = o.id
-      LEFT JOIN users o_u ON o.user_id = o_u.id
-      WHERE 1=1
-    `;
-    const params = [];
-
-    // Role-based Access Filters
-    if (req.user.role === 'citizen') {
-      query += ' AND g.citizen_id = ?';
-      params.push(req.user.id);
-    } else if (req.user.role === 'officer') {
-      // Officers see their assigned grievances OR any unassigned grievances in their department
-      const officer = db.prepare('SELECT id, department_id FROM officers WHERE user_id = ?').get(req.user.id);
-      if (officer) {
-        query += ' AND (g.assigned_officer_id = ? OR (g.department_id = ? AND g.assigned_officer_id IS NULL))';
-        params.push(officer.id, officer.department_id);
-      } else {
-        return res.status(403).json({ error: 'Unauthorized officer profile.' });
-      }
-    } // Admins see all
-
-    // Search filter
-    if (search) {
-      query += ' AND (g.id LIKE ? OR g.title LIKE ? OR g.city LIKE ? OR g.district LIKE ? OR s.name LIKE ?)';
-      const searchWildcard = `%${search}%`;
-      params.push(searchWildcard, searchWildcard, searchWildcard, searchWildcard, searchWildcard);
-    }
-
-    // Explicit Filter options
-    if (status) {
-      query += ' AND g.status = ?';
-      params.push(status);
-    }
-    if (priority) {
-      query += ' AND g.priority = ?';
-      params.push(priority);
-    }
-    if (departmentId) {
-      query += ' AND g.department_id = ?';
-      params.push(parseInt(departmentId));
-    }
-    if (categoryId) {
-      query += ' AND s.category_id = ?';
-      params.push(parseInt(categoryId));
-    }
-    if (isBreached === 'true') {
-      query += " AND g.status NOT IN ('RESOLVED', 'CLOSED', 'REJECTED') AND g.sla_deadline < CURRENT_TIMESTAMP";
-    }
-
-    query += ' ORDER BY g.created_at DESC';
-
-    const grievances = db.prepare(query).all(...params);
-    res.json(grievances);
-  } catch (error) {
-    console.error('List grievances error:', error);
-    res.status(500).json({ error: 'Server error listing grievances.' });
-  }
-}
-
-// 3. Get Grievance Details
-function getById(req, res) {
-  const { id } = req.params;
-
-  try {
-    const grievance = db.prepare(`
-      SELECT g.*, 
-             s.name as subcategory_name, 
-             c.name as category_name, 
-             d.name as department_name, 
-             d.contact_email as department_email,
-             d.contact_phone as department_phone,
-             u.name as citizen_name,
-             u.email as citizen_email,
-             u.phone as citizen_phone,
-             o_u.name as officer_name,
-             o.designation as officer_designation
-      FROM grievances g
-      LEFT JOIN subcategories s ON g.subcategory_id = s.id
-      LEFT JOIN categories c ON s.category_id = c.id
-      LEFT JOIN departments d ON g.department_id = d.id
-      LEFT JOIN users u ON g.citizen_id = u.id
-      LEFT JOIN officers o ON g.assigned_officer_id = o.id
-      LEFT JOIN users o_u ON o.user_id = o_u.id
-      WHERE g.id = ?
-    `).get(id);
-
-    if (!grievance) {
-      return res.status(404).json({ error: 'Grievance not found.' });
-    }
-
-    // Role-based visibility check
-    if (req.user.role === 'citizen' && grievance.citizen_id !== req.user.id) {
-      return res.status(403).json({ error: 'Access Denied: This is not your grievance record.' });
-    }
-
-    // Hide citizen contact info if private toggle is on and requesting user is NOT officer/admin
-    if (grievance.is_private === 1 && req.user.role === 'citizen' && grievance.citizen_id !== req.user.id) {
-      grievance.citizen_email = '[PRIVATE]';
-      grievance.citizen_phone = '[PRIVATE]';
-    }
-
-    // Fetch History Timeline
-    const history = db.prepare(`
-      SELECT h.*, u.name as changed_by_name, u.role as changed_by_role 
-      FROM grievance_history h
-      LEFT JOIN users u ON h.changed_by = u.id
-      WHERE h.grievance_id = ?
-      ORDER BY h.timestamp ASC
-    `).all(id);
-
-    // Fetch Comments (exclude internal ones if user is citizen)
-    let commentQuery = `
-      SELECT c.*, u.name as user_name, u.role as user_role 
-      FROM grievance_comments c
-      LEFT JOIN users u ON c.user_id = u.id
-      WHERE c.grievance_id = ?
-    `;
-    const commentParams = [id];
-
-    if (req.user.role === 'citizen') {
-      commentQuery += ' AND c.is_internal = 0';
-    }
-    commentQuery += ' ORDER BY c.created_at ASC';
-    const comments = db.prepare(commentQuery).all(...commentParams);
-
-    // Fetch Attachments
-    const attachments = db.prepare('SELECT * FROM attachments WHERE grievance_id = ?').all(id);
-
-    // Fetch Feedback
-    const feedback = db.prepare('SELECT * FROM feedback WHERE grievance_id = ?').get(id);
-
-    res.json({
-      grievance,
-      history,
-      comments,
+      category: category || aiResult.category,
+      subcategory: subcategory || aiResult.subcategory,
+      department: dept?._id || null,
+      submittedBy: req.user._id,
+      isAnonymous: isAnonymous === 'true' || isAnonymous === true,
+      priority: aiResult.priority,
       attachments,
-      feedback: feedback || null
-    });
-  } catch (error) {
-    console.error('Fetch grievance details error:', error);
-    res.status(500).json({ error: 'Server error retrieving grievance details.' });
-  }
-}
-
-// 4. Update Status (with history logging & citizen notifications)
-function updateStatus(req, res) {
-  const { id } = req.params;
-  const { status, remarks } = req.body;
-
-  if (!status) {
-    return res.status(400).json({ error: 'New status value is required.' });
-  }
-
-  try {
-    const grievance = db.prepare('SELECT id, status, citizen_id, title FROM grievances WHERE id = ?').get(id);
-    if (!grievance) {
-      return res.status(404).json({ error: 'Grievance not found.' });
-    }
-
-    // Access control for status changes
-    // Citizens can reopen resolved or close tickets
-    if (req.user.role === 'citizen') {
-      if (grievance.citizen_id !== req.user.id) {
-        return res.status(403).json({ error: 'Unauthorized operation.' });
-      }
-      if (!['REOPENED', 'CLOSED'].includes(status)) {
-        return res.status(400).json({ error: 'Citizens are only allowed to reopen or close their grievances.' });
-      }
-    }
-
-    const updatedAt = new Date().toISOString();
-
-    db.prepare(`
-      UPDATE grievances 
-      SET status = ?, updated_at = ? 
-      WHERE id = ?
-    `).run(status, updatedAt, id);
-
-    // Write to history
-    db.prepare(`
-      INSERT INTO grievance_history (grievance_id, previous_status, new_status, changed_by, remarks, timestamp)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(id, grievance.status, status, req.user.id, remarks || `Status updated to ${status}.`, updatedAt);
-
-    // Audit Log
-    db.prepare(`
-      INSERT INTO audit_logs (user_id, action, entity_type, entity_id, metadata)
-      VALUES (?, 'UPDATE_STATUS', 'grievance', ?, ?)
-    `).run(req.user.id, id, JSON.stringify({ from: grievance.status, to: status, remarks }));
-
-    // Notify citizen if changed by officer/admin
-    if (req.user.id !== grievance.citizen_id) {
-      db.prepare(`
-        INSERT INTO notifications (user_id, grievance_id, message)
-        VALUES (?, ?, ?)
-      `).run(
-        grievance.citizen_id, 
-        id, 
-        `Your grievance ${id} status has been updated to ${status} by ${req.user.name}. Remarks: "${remarks || 'None'}"`
-      );
-    }
-
-    res.json({ message: `Status updated successfully to ${status}.` });
-  } catch (error) {
-    console.error('Update grievance status error:', error);
-    res.status(500).json({ error: 'Server error updating status.' });
-  }
-}
-
-// 5. Add Comment
-function addComment(req, res) {
-  const { id } = req.params;
-  const { comment, isInternal } = req.body;
-
-  if (!comment) {
-    return res.status(400).json({ error: 'Comment text is required.' });
-  }
-
-  try {
-    const grievance = db.prepare('SELECT id, citizen_id, assigned_officer_id, title FROM grievances WHERE id = ?').get(id);
-    if (!grievance) {
-      return res.status(404).json({ error: 'Grievance not found.' });
-    }
-
-    // Validate internal comment rights (officers/admins only)
-    let internalVal = 0;
-    if (isInternal && req.user.role !== 'citizen') {
-      internalVal = 1;
-    }
-
-    const result = db.prepare(`
-      INSERT INTO grievance_comments (grievance_id, user_id, comment, is_internal)
-      VALUES (?, ?, ?, ?)
-    `).run(id, req.user.id, comment, internalVal);
-
-    // Notify appropriate parties
-    if (req.user.role === 'citizen') {
-      // Notify assigned officer, or department head if unassigned
-      if (grievance.assigned_officer_id) {
-        const officerUser = db.prepare('SELECT user_id FROM officers WHERE id = ?').get(grievance.assigned_officer_id);
-        if (officerUser) {
-          db.prepare(`
-            INSERT INTO notifications (user_id, grievance_id, message)
-            VALUES (?, ?, ?)
-          `).run(officerUser.user_id, id, `New citizen reply on ${id}: "${comment.substring(0, 40)}..."`);
-        }
-      }
-    } else if (internalVal === 0) {
-      // Public reply from official: Notify citizen
-      db.prepare(`
-        INSERT INTO notifications (user_id, grievance_id, message)
-        VALUES (?, ?, ?)
-      `).run(grievance.citizen_id, id, `Official comment added on ${id} by ${req.user.name}: "${comment.substring(0, 40)}..."`);
-    }
-
-    res.status(211).json({
-      message: 'Comment posted successfully!',
-      comment: {
-        id: result.lastInsertRowid,
-        grievance_id: id,
-        user_id: req.user.id,
-        comment,
-        is_internal: internalVal,
-        user_name: req.user.name,
-        user_role: req.user.role,
-        created_at: new Date().toISOString()
-      }
-    });
-  } catch (error) {
-    console.error('Add comment error:', error);
-    res.status(500).json({ error: 'Server error posting comment.' });
-  }
-}
-
-// 6. Assign Grievance (Admin or Department Officer with rights)
-function assign(req, res) {
-  const { id } = req.params;
-  const { departmentId, officerId } = req.body;
-
-  try {
-    const grievance = db.prepare('SELECT id, status, department_id, assigned_officer_id FROM grievances WHERE id = ?').get(id);
-    if (!grievance) {
-      return res.status(404).json({ error: 'Grievance not found.' });
-    }
-
-    // Role check: Only admin can reassign across departments. 
-    // Officers can only assign/reassign within their own department if they are supervisors.
-    if (req.user.role !== 'admin') {
-      const officer = db.prepare('SELECT department_id FROM officers WHERE user_id = ?').get(req.user.id);
-      if (!officer || officer.department_id !== grievance.department_id) {
-        return res.status(403).json({ error: 'Permission denied: Cannot reassign tickets outside your department.' });
-      }
-    }
-
-    let nextStatus = grievance.status;
-    let remarks = '';
-    
-    // Auto shift status to ASSIGNED/ACKNOWLEDGED if relevant
-    if (['SUBMITTED', 'ACKNOWLEDGED'].includes(grievance.status)) {
-      nextStatus = 'ASSIGNED';
-    }
-
-    const updatedAt = new Date().toISOString();
-
-    // Update DB
-    if (departmentId && officerId) {
-      db.prepare(`
-        UPDATE grievances 
-        SET department_id = ?, assigned_officer_id = ?, status = ?, updated_at = ? 
-        WHERE id = ?
-      `).run(departmentId, officerId, nextStatus, updatedAt, id);
-
-      const deptName = db.prepare('SELECT name FROM departments WHERE id = ?').get(departmentId).name;
-      const officerName = db.prepare('SELECT name FROM users u JOIN officers o ON u.id = o.user_id WHERE o.id = ?').get(officerId).name;
-      remarks = `Routed to Department: ${deptName}. Assigned to Officer: ${officerName}.`;
-
-      // Notify officer
-      const officerUser = db.prepare('SELECT user_id FROM officers WHERE id = ?').get(officerId);
-      db.prepare(`
-        INSERT INTO notifications (user_id, grievance_id, message)
-        VALUES (?, ?, ?)
-      `).run(officerUser.user_id, id, `Grievance ${id} has been assigned to you.`);
-
-    } else if (departmentId) {
-      db.prepare(`
-        UPDATE grievances 
-        SET department_id = ?, assigned_officer_id = NULL, status = ?, updated_at = ? 
-        WHERE id = ?
-      `).run(departmentId, nextStatus, updatedAt, id);
-
-      const deptName = db.prepare('SELECT name FROM departments WHERE id = ?').get(departmentId).name;
-      remarks = `Routed to Department: ${deptName}. Officer assignment pending.`;
-    }
-
-    // Write history
-    db.prepare(`
-      INSERT INTO grievance_history (grievance_id, previous_status, new_status, changed_by, remarks, timestamp)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(id, grievance.status, nextStatus, req.user.id, remarks, updatedAt);
-
-    // Audit Log
-    db.prepare(`
-      INSERT INTO audit_logs (user_id, action, entity_type, entity_id, metadata)
-      VALUES (?, 'ASSIGN_GRIEVANCE', 'grievance', ?, ?)
-    `).run(req.user.id, id, JSON.stringify({ departmentId, officerId, remarks }));
-
-    res.json({ message: 'Grievance assigned/routed successfully.', status: nextStatus });
-  } catch (error) {
-    console.error('Assign grievance error:', error);
-    res.status(500).json({ error: 'Server error routing grievance.' });
-  }
-}
-
-// 7. Escalate Grievance (Officer or system trigger)
-function escalate(req, res) {
-  const { id } = req.params;
-  const { reason } = req.body;
-
-  if (!reason) {
-    return res.status(400).json({ error: 'Escalation reason is required.' });
-  }
-
-  try {
-    const grievance = db.prepare('SELECT id, status, assigned_officer_id, department_id FROM grievances WHERE id = ?').get(id);
-    if (!grievance) {
-      return res.status(404).json({ error: 'Grievance not found.' });
-    }
-
-    const updatedAt = new Date().toISOString();
-
-    // Update status to ESCALATED
-    db.prepare(`
-      UPDATE grievances 
-      SET status = 'ESCALATED', updated_at = ? 
-      WHERE id = ?
-    `).run(updatedAt, id);
-
-    // Log escalation record
-    db.prepare(`
-      INSERT INTO escalations (grievance_id, escalated_from_officer_id, reason)
-      VALUES (?, ?, ?)
-    `).run(id, grievance.assigned_officer_id || null, reason);
-
-    // Write history
-    db.prepare(`
-      INSERT INTO grievance_history (grievance_id, previous_status, new_status, changed_by, remarks, timestamp)
-      VALUES (?, ?, 'ESCALATED', ?, ?, ?)
-    `).run(id, grievance.status, req.user.id, `Escalated: ${reason}`, updatedAt);
-
-    // Audit Log
-    db.prepare(`
-      INSERT INTO audit_logs (user_id, action, entity_type, entity_id, metadata)
-      VALUES (?, 'ESCALATE_GRIEVANCE', 'grievance', ?, ?)
-    `).run(req.user.id, id, JSON.stringify({ reason }));
-
-    // Notify Admins
-    const admins = db.prepare("SELECT id FROM users WHERE role = 'admin'").all();
-    const insertNotif = db.prepare(`
-      INSERT INTO notifications (user_id, grievance_id, message)
-      VALUES (?, ?, ?)
-    `);
-    admins.forEach(admin => {
-      insertNotif.run(admin.id, id, `CRITICAL: Grievance ${id} has been escalated: "${reason}"`);
+      tags: tags ? (Array.isArray(tags) ? tags : tags.split(',').map(t => t.trim())) : [],
+      aiClassification: {
+        ...aiResult,
+        classifiedAt: new Date()
+      },
+      isAiRouted: aiResult.isAiRouted,
+      slaDeadline: computeSlaDeadline(aiResult.priority, dept),
+      history: [{
+        previousStatus: null,
+        newStatus: 'SUBMITTED',
+        changedBy: req.user._id,
+        remarks: 'Grievance submitted successfully.'
+      }]
     });
 
-    res.json({ message: 'Grievance escalated successfully.' });
-  } catch (error) {
-    console.error('Escalate grievance error:', error);
-    res.status(500).json({ error: 'Server error escalating grievance.' });
-  }
-}
-
-// 8. Submit Feedback/Rating (Citizen only)
-function submitFeedback(req, res) {
-  const { id } = req.params;
-  const { rating, comments } = req.body;
-
-  if (!rating || rating < 1 || rating > 5) {
-    return res.status(400).json({ error: 'Rating must be an integer between 1 and 5.' });
-  }
-
-  try {
-    const grievance = db.prepare('SELECT id, status, citizen_id FROM grievances WHERE id = ?').get(id);
-    if (!grievance) {
-      return res.status(404).json({ error: 'Grievance not found.' });
+    // Increment dept total
+    if (dept) {
+      await Department.findByIdAndUpdate(dept._id, { $inc: { totalGrievances: 1 } });
     }
-
-    if (grievance.citizen_id !== req.user.id) {
-      return res.status(403).json({ error: 'Access Denied: Feedback can only be submitted by the filing citizen.' });
-    }
-
-    if (grievance.status !== 'RESOLVED') {
-      return res.status(400).json({ error: 'Feedback can only be submitted on RESOLVED grievances.' });
-    }
-
-    // Insert feedback
-    db.prepare(`
-      INSERT INTO feedback (grievance_id, rating, comments)
-      VALUES (?, ?, ?)
-    `).run(id, rating, comments || null);
-
-    const updatedAt = new Date().toISOString();
-
-    // Auto-close grievance upon receiving feedback
-    db.prepare(`
-      UPDATE grievances 
-      SET status = 'CLOSED', updated_at = ? 
-      WHERE id = ?
-    `).run(updatedAt, id);
-
-    // Log history
-    db.prepare(`
-      INSERT INTO grievance_history (grievance_id, previous_status, new_status, changed_by, remarks, timestamp)
-      VALUES (?, 'RESOLVED', 'CLOSED', ?, ?, ?)
-    `).run(id, req.user.id, `Citizen rated resolution: ${rating} Stars. Ticket Closed.`, updatedAt);
-
-    // Audit Log
-    db.prepare(`
-      INSERT INTO audit_logs (user_id, action, entity_type, entity_id, metadata)
-      VALUES (?, 'SUBMIT_FEEDBACK', 'grievance', ?, ?)
-    `).run(req.user.id, id, JSON.stringify({ rating }));
-
-    res.json({ message: 'Feedback submitted and grievance closed.' });
-  } catch (error) {
-    console.error('Submit feedback error:', error);
-    res.status(500).json({ error: 'Server error saving feedback.' });
-  }
-}
-
-// 9. Upload Attachments
-function uploadAttachments(req, res) {
-  const { id } = req.params;
-
-  try {
-    const grievance = db.prepare('SELECT id, citizen_id FROM grievances WHERE id = ?').get(id);
-    if (!grievance) {
-      return res.status(404).json({ error: 'Grievance not found.' });
-    }
-
-    if (!req.files || req.files.length === 0) {
-      return res.status(400).json({ error: 'No files uploaded.' });
-    }
-
-    const insertAttachment = db.prepare(`
-      INSERT INTO attachments (grievance_id, file_name, file_path, file_type, file_size)
-      VALUES (?, ?, ?, ?, ?)
-    `);
-
-    const saved = [];
-    req.files.forEach(file => {
-      // Store relative path for frontend rendering
-      const filePath = `/uploads/${file.filename}`;
-      const result = insertAttachment.run(id, file.originalname, filePath, file.mimetype, file.size);
-      
-      saved.push({
-        id: result.lastInsertRowid,
-        file_name: file.originalname,
-        file_path: filePath,
-        file_type: file.mimetype,
-        file_size: file.size
-      });
-    });
 
     // Audit log
-    db.prepare(`
-      INSERT INTO audit_logs (user_id, action, entity_type, entity_id, metadata)
-      VALUES (?, 'UPLOAD_ATTACHMENT', 'grievance', ?, ?)
-    `).run(req.user.id, id, JSON.stringify({ count: req.files.length }));
+    await AuditLog.create({
+      action: 'GRIEVANCE_SUBMITTED',
+      performedBy: req.user._id,
+      targetEntity: 'grievance',
+      targetId: grievance._id,
+      metadata: { trackingId: grievance.trackingId, department: departmentName }
+    });
 
-    res.json({
-      message: 'Files uploaded successfully.',
-      attachments: saved
+    // Notify student
+    await createNotification(
+      req.user._id,
+      'GRIEVANCE_SUBMITTED',
+      '✅ Grievance Submitted',
+      `Your grievance "${title}" has been submitted successfully. Tracking ID: ${grievance.trackingId}`,
+      grievance._id,
+      `#grievance/detail/${grievance._id}`
+    );
+
+    // Notify department officers
+    if (dept?.officers?.length > 0) {
+      for (const officerId of dept.officers) {
+        await createNotification(
+          officerId,
+          'GRIEVANCE_ASSIGNED',
+          '📋 New Grievance in Your Department',
+          `A new ${aiResult.priority} priority grievance has been submitted: "${title}"`,
+          grievance._id,
+          `#officer/grievance/${grievance._id}`
+        );
+      }
+    }
+
+    const populated = await Grievance.findById(grievance._id)
+      .populate('department', 'name code')
+      .populate('submittedBy', 'name email studentId');
+
+    res.status(201).json({
+      message: 'Grievance submitted successfully!',
+      grievance: populated,
+      aiClassification: aiResult
     });
   } catch (error) {
-    console.error('Upload attachments error:', error);
-    res.status(500).json({ error: 'Server error saving attachments.' });
+    console.error('[Grievance] Submit error:', error);
+    res.status(500).json({ error: 'Server error submitting grievance.' });
   }
-}
+};
 
-module.exports = {
-  submit,
-  list,
-  getById,
-  updateStatus,
-  addComment,
-  assign,
-  escalate,
-  submitFeedback,
-  uploadAttachments
+// GET /api/grievances - List grievances (role-based)
+exports.getGrievances = async (req, res) => {
+  try {
+    const { status, priority, department, category, search, page = 1, limit = 10, sortBy = 'createdAt', order = 'desc' } = req.query;
+
+    const query = {};
+    const user = req.user;
+
+    // Role-based filtering
+    if (user.role === 'student') {
+      query.submittedBy = user._id;
+    } else if (user.role === 'officer' || user.role === 'faculty') {
+      if (user.assignedDepartment) query.department = user.assignedDepartment._id;
+    } else if (user.role === 'dean') {
+      // Dean sees escalated + all
+    }
+    // admin sees all
+
+    if (status) query.status = status;
+    if (priority) query.priority = priority;
+    if (department && ['admin', 'dean'].includes(user.role)) query.department = department;
+    if (category) query.category = category;
+    if (search) {
+      query.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { trackingId: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const sortOrder = order === 'asc' ? 1 : -1;
+
+    const [grievances, total] = await Promise.all([
+      Grievance.find(query)
+        .populate('department', 'name code')
+        .populate('submittedBy', 'name email studentId department')
+        .populate('assignedTo', 'name email')
+        .sort({ [sortBy]: sortOrder })
+        .skip(skip)
+        .limit(parseInt(limit))
+        .lean(),
+      Grievance.countDocuments(query)
+    ]);
+
+    res.json({
+      grievances,
+      pagination: { total, page: parseInt(page), limit: parseInt(limit), pages: Math.ceil(total / parseInt(limit)) }
+    });
+  } catch (error) {
+    console.error('[Grievance] List error:', error);
+    res.status(500).json({ error: 'Server error fetching grievances.' });
+  }
+};
+
+// GET /api/grievances/:id - Get grievance detail
+exports.getGrievanceById = async (req, res) => {
+  try {
+    const grievance = await Grievance.findById(req.params.id)
+      .populate('department', 'name code contactEmail')
+      .populate('submittedBy', 'name email studentId department year section')
+      .populate('assignedTo', 'name email designation')
+      .populate('history.changedBy', 'name role')
+      .populate('comments.author', 'name role');
+
+    if (!grievance) return res.status(404).json({ error: 'Grievance not found.' });
+
+    const user = req.user;
+    const isOwner = grievance.submittedBy._id.toString() === user._id.toString();
+    const isOfficer = ['officer', 'faculty', 'admin', 'dean'].includes(user.role);
+
+    if (!isOwner && !isOfficer) {
+      return res.status(403).json({ error: 'Access denied.' });
+    }
+
+    // Increment view count
+    await Grievance.findByIdAndUpdate(req.params.id, { $inc: { viewCount: 1 } });
+
+    // Filter internal comments for students
+    if (user.role === 'student') {
+      grievance.comments = grievance.comments.filter(c => !c.isInternal);
+    }
+
+    res.json({ grievance });
+  } catch (error) {
+    console.error('[Grievance] Get by ID error:', error);
+    res.status(500).json({ error: 'Server error fetching grievance.' });
+  }
+};
+
+// GET /api/grievances/track/:trackingId - Public tracking
+exports.trackGrievance = async (req, res) => {
+  try {
+    const grievance = await Grievance.findOne({ trackingId: req.params.trackingId.toUpperCase() })
+      .populate('department', 'name code')
+      .populate('assignedTo', 'name designation')
+      .select('-comments -aiClassification -attachments');
+
+    if (!grievance) return res.status(404).json({ error: 'Grievance not found with this tracking ID.' });
+
+    res.json({ grievance });
+  } catch (error) {
+    res.status(500).json({ error: 'Server error tracking grievance.' });
+  }
+};
+
+// PATCH /api/grievances/:id/status - Update status (officer/admin)
+exports.updateStatus = async (req, res) => {
+  try {
+    const { status, remarks, resolutionNote } = req.body;
+    const validStatuses = ['UNDER_REVIEW', 'IN_PROGRESS', 'RESOLVED', 'CLOSED', 'REJECTED', 'ESCALATED'];
+
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ error: 'Invalid status.' });
+    }
+
+    const grievance = await Grievance.findById(req.params.id).populate('submittedBy', 'name');
+    if (!grievance) return res.status(404).json({ error: 'Grievance not found.' });
+
+    const previousStatus = grievance.status;
+    grievance.status = status;
+    if (resolutionNote) grievance.resolutionNote = resolutionNote;
+    if (status === 'RESOLVED') grievance.resolvedAt = new Date();
+    if (status === 'CLOSED') grievance.closedAt = new Date();
+    if (status === 'ESCALATED') {
+      grievance.escalatedAt = new Date();
+      grievance.escalatedBy = req.user._id;
+      grievance.escalationReason = remarks;
+    }
+
+    grievance.history.push({
+      previousStatus,
+      newStatus: status,
+      changedBy: req.user._id,
+      remarks: remarks || `Status changed to ${status}`
+    });
+
+    await grievance.save();
+
+    // Update dept resolved count
+    if (status === 'RESOLVED' && grievance.department) {
+      await Department.findByIdAndUpdate(grievance.department, { $inc: { resolvedGrievances: 1 } });
+    }
+
+    // Notify student
+    const statusMessages = {
+      UNDER_REVIEW: 'Your grievance is now under review.',
+      IN_PROGRESS: 'Your grievance is being actively worked on.',
+      RESOLVED: `Your grievance has been resolved. ${resolutionNote ? 'Note: ' + resolutionNote : ''}`,
+      CLOSED: 'Your grievance has been closed.',
+      REJECTED: `Your grievance has been rejected. ${remarks ? 'Reason: ' + remarks : ''}`,
+      ESCALATED: 'Your grievance has been escalated to senior management.'
+    };
+
+    await createNotification(
+      grievance.submittedBy._id,
+      'STATUS_CHANGED',
+      `📬 Grievance Status Updated: ${status}`,
+      statusMessages[status] || `Status updated to ${status}`,
+      grievance._id,
+      `#grievance/detail/${grievance._id}`
+    );
+
+    await AuditLog.create({
+      action: 'GRIEVANCE_STATUS_UPDATED',
+      performedBy: req.user._id,
+      targetEntity: 'grievance',
+      targetId: grievance._id,
+      metadata: { previousStatus, newStatus: status, remarks }
+    });
+
+    res.json({ message: `Grievance status updated to ${status}.`, grievance });
+  } catch (error) {
+    console.error('[Grievance] Status update error:', error);
+    res.status(500).json({ error: 'Server error updating status.' });
+  }
+};
+
+// POST /api/grievances/:id/comments - Add comment
+exports.addComment = async (req, res) => {
+  try {
+    const { text, isInternal } = req.body;
+    if (!text?.trim()) return res.status(400).json({ error: 'Comment text is required.' });
+
+    const grievance = await Grievance.findById(req.params.id);
+    if (!grievance) return res.status(404).json({ error: 'Grievance not found.' });
+
+    const internal = isInternal && ['officer', 'admin', 'faculty', 'dean'].includes(req.user.role);
+
+    grievance.comments.push({
+      author: req.user._id,
+      text: text.trim(),
+      isInternal: internal
+    });
+    await grievance.save();
+
+    // Notify if student commented → notify officer, and vice versa
+    if (req.user.role === 'student') {
+      if (grievance.assignedTo) {
+        await createNotification(grievance.assignedTo, 'COMMENT_ADDED', '💬 New Comment', `Student added a comment on grievance ${grievance.trackingId}`, grievance._id);
+      }
+    } else {
+      if (!internal) {
+        await createNotification(grievance.submittedBy, 'COMMENT_ADDED', '💬 New Response', `An officer responded to your grievance ${grievance.trackingId}`, grievance._id, `#grievance/detail/${grievance._id}`);
+      }
+    }
+
+    const updated = await Grievance.findById(req.params.id).populate('comments.author', 'name role');
+    res.json({ message: 'Comment added.', comments: updated.comments });
+  } catch (error) {
+    console.error('[Grievance] Add comment error:', error);
+    res.status(500).json({ error: 'Server error adding comment.' });
+  }
+};
+
+// PATCH /api/grievances/:id/assign - Assign to officer
+exports.assignGrievance = async (req, res) => {
+  try {
+    const { officerId } = req.body;
+    const grievance = await Grievance.findByIdAndUpdate(
+      req.params.id,
+      { assignedTo: officerId },
+      { new: true }
+    ).populate('assignedTo', 'name email');
+
+    if (!grievance) return res.status(404).json({ error: 'Grievance not found.' });
+
+    await createNotification(officerId, 'GRIEVANCE_ASSIGNED', '📋 Grievance Assigned to You', `Grievance ${grievance.trackingId} has been assigned to you.`, grievance._id, `#officer/grievance/${grievance._id}`);
+
+    res.json({ message: 'Grievance assigned successfully.', grievance });
+  } catch (error) {
+    res.status(500).json({ error: 'Server error assigning grievance.' });
+  }
+};
+
+// POST /api/grievances/:id/feedback - Submit feedback (student, after resolved)
+exports.submitFeedback = async (req, res) => {
+  try {
+    const { rating, comment } = req.body;
+    if (!rating || rating < 1 || rating > 5) return res.status(400).json({ error: 'Rating must be between 1 and 5.' });
+
+    const grievance = await Grievance.findById(req.params.id);
+    if (!grievance) return res.status(404).json({ error: 'Grievance not found.' });
+    if (grievance.submittedBy.toString() !== req.user._id.toString()) return res.status(403).json({ error: 'Access denied.' });
+    if (grievance.status !== 'RESOLVED') return res.status(400).json({ error: 'Can only provide feedback on resolved grievances.' });
+
+    grievance.feedback = { rating, comment, submittedAt: new Date() };
+    grievance.status = 'CLOSED';
+    grievance.closedAt = new Date();
+    await grievance.save();
+
+    res.json({ message: 'Feedback submitted. Thank you!', grievance });
+  } catch (error) {
+    res.status(500).json({ error: 'Server error submitting feedback.' });
+  }
+};
+
+// POST /api/grievances/ai-classify - Classify text using AI (preview)
+exports.aiClassify = async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text) return res.status(400).json({ error: 'Text is required for classification.' });
+    const result = await classifyGrievance(text);
+    res.json({ classification: result });
+  } catch (error) {
+    res.status(500).json({ error: 'AI classification failed.' });
+  }
 };

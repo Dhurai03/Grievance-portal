@@ -1,46 +1,60 @@
-const { db } = require('../config/db');
+const Notification = require('../models/Notification');
 
-// Get all notifications for current user
-function getAll(req, res) {
+// GET /api/notifications
+exports.getNotifications = async (req, res) => {
   try {
-    const notifications = db.prepare(`
-      SELECT * FROM notifications 
-      WHERE user_id = ? 
-      ORDER BY created_at DESC
-      LIMIT 100
-    `).all(req.user.id);
+    const { page = 1, limit = 20, unreadOnly = false } = req.query;
+    const query = { recipient: req.user._id };
+    if (unreadOnly === 'true') query.isRead = false;
 
-    res.json(notifications);
+    const [notifications, total, unreadCount] = await Promise.all([
+      Notification.find(query)
+        .populate('grievance', 'trackingId title')
+        .sort({ createdAt: -1 })
+        .skip((parseInt(page) - 1) * parseInt(limit))
+        .limit(parseInt(limit)),
+      Notification.countDocuments(query),
+      Notification.countDocuments({ recipient: req.user._id, isRead: false })
+    ]);
+
+    res.json({ notifications, total, unreadCount, page: parseInt(page) });
   } catch (error) {
-    console.error('Fetch notifications error:', error);
-    res.status(500).json({ error: 'Server error fetching notifications.' });
+    res.status(500).json({ error: 'Error fetching notifications.' });
   }
-}
+};
 
-// Mark notification as read
-function markAsRead(req, res) {
-  const { id } = req.params;
-
+// PATCH /api/notifications/:id/read
+exports.markRead = async (req, res) => {
   try {
-    const notif = db.prepare('SELECT id, user_id FROM notifications WHERE id = ?').get(id);
-    if (!notif) {
-      return res.status(404).json({ error: 'Notification not found.' });
-    }
-
-    if (notif.user_id !== req.user.id) {
-      return res.status(403).json({ error: 'Unauthorized operation.' });
-    }
-
-    db.prepare('UPDATE notifications SET is_read = 1 WHERE id = ?').run(id);
-
+    await Notification.findOneAndUpdate(
+      { _id: req.params.id, recipient: req.user._id },
+      { isRead: true, readAt: new Date() }
+    );
     res.json({ message: 'Notification marked as read.' });
   } catch (error) {
-    console.error('Mark notification read error:', error);
-    res.status(500).json({ error: 'Server error updating notification status.' });
+    res.status(500).json({ error: 'Error marking notification.' });
   }
-}
+};
 
-module.exports = {
-  getAll,
-  markAsRead
+// PATCH /api/notifications/mark-all-read
+exports.markAllRead = async (req, res) => {
+  try {
+    await Notification.updateMany(
+      { recipient: req.user._id, isRead: false },
+      { isRead: true, readAt: new Date() }
+    );
+    res.json({ message: 'All notifications marked as read.' });
+  } catch (error) {
+    res.status(500).json({ error: 'Error marking notifications.' });
+  }
+};
+
+// DELETE /api/notifications/:id
+exports.deleteNotification = async (req, res) => {
+  try {
+    await Notification.findOneAndDelete({ _id: req.params.id, recipient: req.user._id });
+    res.json({ message: 'Notification deleted.' });
+  } catch (error) {
+    res.status(500).json({ error: 'Error deleting notification.' });
+  }
 };

@@ -26,6 +26,7 @@ dist-ssr
 # Database and uploads
 *.db
 *.db-journal
+backend/data/
 backend/uploads/*
 !backend/uploads/.gitkeep
 

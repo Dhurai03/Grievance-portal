@@ -1,61 +1,96 @@
-# Project Setup Guide - JanSuniye Portal
+# Setup & Local Execution Guide - EduGrieve
 
-This guide provides steps to install dependencies, initialize databases, and launch the Grievance Redressal Platform in a local development environment.
-
----
-
-## Prerequisites
-
-Ensure you have the following installed:
-- **Node.js** (v22.5.0 or later, as we use native `node:sqlite` DatabaseSync)
-- **NPM** (v10 or later)
+Follow these instructions to set up and run the EduGrieve College Grievance Portal locally.
 
 ---
 
-## 1. Quick Start Execution
+## 1. Prerequisites
 
-1. **Install Root Node Modules (Frontend & Backend Packages)**:
-   ```bash
-   npm install
-   ```
-2. **Initialize SQLite Database & Seed Demo Data**:
-   ```bash
-   node backend/initDb.js
-   ```
-3. **Start the Express API Backend Server**:
-   ```bash
-   node backend/server.js
-   ```
-4. **Launch Vite React Frontend (In a separate terminal)**:
-   ```bash
-   npm run dev
-   ```
-5. **Access Portal**:
-   Open [http://localhost:5173](http://localhost:5173) in your browser.
+- **Node.js**: v20 or higher
+- **MongoDB**: Local MongoDB community service (`mongodb://localhost:27017`) or MongoDB Atlas URI
+- **NPM**: v10 or higher
 
 ---
 
-## 2. Sandbox Accounts
+## 2. Directory Layout
 
-Use these pre-configured credentials to bypass registration during testing:
-
-- **Citizen Access**:
-  - Email: `citizen@example.com`
-  - Password: `citizen123`
-- **Department Officer Access**:
-  - Email: `officer@example.com`
-  - Password: `officer123`
-- **System Administrator Access**:
-  - Email: `admin@example.com`
-  - Password: `admin123`
+```
+Grievance/
+├── backend/    # Express server, MongoDB models, NLP classifier & AI engine
+├── frontend/   # React 19 + Vite client application
+├── docs/       # Architecture & API documentation
+└── README.md   # Project overview
+```
 
 ---
 
-## 3. Running Heuristic Verification Tests
+## 3. Dependency Installation
 
-To verify that the database integrity, bcrypt password encryption, and smart AI classification suggestion utilities are fully functional, execute the test script:
+From the root directory:
+
+```bash
+# 1. Install backend dependencies
+cd backend
+npm install
+
+# 2. Install frontend dependencies
+cd ../frontend
+npm install
+```
+
+---
+
+## 4. Environment Setup
+
+Verify `backend/.env`:
+```env
+PORT=5000
+MONGODB_URI=mongodb://localhost:27017/college_grievance_portal
+JWT_SECRET=college_grievance_super_secret_key_2024
+JWT_EXPIRES_IN=7d
+NODE_ENV=development
+FRONTEND_URL=http://localhost:5173
+
+# Optional: Set your Google Gemini API Key for live AI responses
+GEMINI_API_KEY=your_key_here
+```
+
+---
+
+## 5. Seed Initial Campus Data
+
+Ensure MongoDB is running, then populate initial departments and demo users:
+
+```bash
+node backend/seed.js
+```
+
+---
+
+## 6. Run System Verification Tests
 
 ```bash
 node backend/tests/verify.js
 ```
-All assertions should pass with a success confirmation output.
+
+---
+
+## 7. Starting the Application
+
+Launch both backend and frontend servers in separate terminal sessions:
+
+**Terminal 1 (Backend):**
+```bash
+cd backend
+npm start
+```
+*Backend runs at: `http://localhost:5000`*
+
+**Terminal 2 (Frontend):**
+```bash
+cd frontend
+npm run dev
+```
+*Frontend runs at: `http://localhost:5173`*
+
+Open **http://localhost:5173** to access EduGrieve!

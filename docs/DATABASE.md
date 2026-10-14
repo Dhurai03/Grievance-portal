@@ -1,132 +1,106 @@
-# Database Schema Reference - JanSuniye
+# MongoDB Collections Reference - EduGrieve
 
-The Grievance Redressal Platform uses a normalized SQLite database stored at `database/grievances.db`. Foreign keys constraints are enforced on runtime initialization.
+EduGrieve uses **MongoDB** with Mongoose Object Data Modeling (ODM).
+
+Database Name: `college_grievance_portal`
 
 ---
 
-## Entity Relationship Tables
+## Collections & Schemas
 
-### 1. `users`
-Stores user profile credentials and system-wide roles.
-- `id` (INTEGER PRIMARY KEY AUTOINCREMENT)
-- `email` (TEXT UNIQUE NOT NULL)
-- `password_hash` (TEXT NOT NULL)
-- `name` (TEXT NOT NULL)
-- `role` (TEXT NOT NULL) - Constraints: `citizen`, `officer`, `admin`
-- `phone` (TEXT NULL)
-- `created_at` (DATETIME DEFAULT CURRENT_TIMESTAMP)
+### 1. `users` (`User.js`)
+Stores student profiles, faculty, department officers, and administration accounts.
+- `name` (String, required)
+- `email` (String, required, unique, lowercase)
+- `password` (String, hashed with bcryptjs)
+- `role` (String, enum: `['student', 'faculty', 'officer', 'dean', 'admin']`, default: `'student'`)
+- `studentId` (String, student roll/registration number)
+- `department` (String, student's branch/major)
+- `year` (Number, current academic year)
+- `section` (String)
+- `designation` (String, for faculty/officers/admin)
+- `assignedDepartment` (ObjectId, ref: `Department`, for officers)
+- `phone` (String)
+- `isActive` (Boolean, default: true)
+- `timestamps` (`createdAt`, `updatedAt`)
 
-### 2. `departments`
-Stores municipal office departments.
-- `id` (INTEGER PRIMARY KEY AUTOINCREMENT)
-- `name` (TEXT UNIQUE NOT NULL) - E.g., Water Supply, Electricity
-- `description` (TEXT NULL)
-- `contact_email` (TEXT NULL)
-- `contact_phone` (TEXT NULL)
-- `status` (TEXT DEFAULT 'active') - Constraints: `active`, `inactive`
-- `created_at` (DATETIME DEFAULT CURRENT_TIMESTAMP)
+---
 
-### 3. `officers`
-Stores designation details for users promoted to the Officer role.
-- `id` (INTEGER PRIMARY KEY AUTOINCREMENT)
-- `user_id` (INTEGER NOT NULL UNIQUE) - Foreign Key `users(id)` ON DELETE CASCADE
-- `department_id` (INTEGER NULL) - Foreign Key `departments(id)` ON DELETE SET NULL
-- `designation` (TEXT NULL)
-- `created_at` (DATETIME DEFAULT CURRENT_TIMESTAMP)
+### 2. `departments` (`Department.js`)
+Stores college departments and their individual SLA response configurations.
+- `name` (String, required, unique) - E.g., Academic Affairs, Hostel & Accommodation, IT & Technical Support
+- `code` (String, required, unique, uppercase) - E.g., `ACAD`, `HSTL`, `IT`, `FIN`, `DISC`
+- `description` (String)
+- `contactEmail` (String)
+- `contactPhone` (String)
+- `head` (ObjectId, ref: `User`)
+- `officers` ([ObjectId, ref: `User`])
+- `slaConfig` (Object, resolution hours per priority):
+  - `LOW` (Number, default: 168 hours / 7 days)
+  - `MEDIUM` (Number, default: 72 hours / 3 days)
+  - `HIGH` (Number, default: 48 hours / 2 days)
+  - `CRITICAL` (Number, default: 24 hours / 1 day)
+- `totalGrievances` (Number, default: 0)
+- `resolvedGrievances` (Number, default: 0)
+- `isActive` (Boolean, default: true)
+- `timestamps` (`createdAt`, `updatedAt`)
 
-### 4. `categories`
-Stores main category groupings.
-- `id` (INTEGER PRIMARY KEY AUTOINCREMENT)
-- `name` (TEXT UNIQUE NOT NULL)
-- `description` (TEXT NULL)
-- `created_at` (DATETIME DEFAULT CURRENT_TIMESTAMP)
+---
 
-### 5. `subcategories`
-Stores nested grievance types, mapping them to departments and configuring SLAs.
-- `id` (INTEGER PRIMARY KEY AUTOINCREMENT)
-- `category_id` (INTEGER NOT NULL) - Foreign Key `categories(id)` ON DELETE CASCADE
-- `name` (TEXT NOT NULL)
-- `department_id` (INTEGER NULL) - Foreign Key `departments(id)` ON DELETE SET NULL
-- `sla_days` (INTEGER DEFAULT 7) - SLA resolution period (Days)
-- `created_at` (DATETIME DEFAULT CURRENT_TIMESTAMP)
-- *Constraint*: `UNIQUE(category_id, name)`
+### 3. `grievances` (`Grievance.js`)
+Stores submitted complaints, AI classification metadata, attachments, and resolution lifecycle history.
+- `trackingId` (String, required, unique) - Format: `EDU-YYYY-XXXXX`
+- `title` (String, required)
+- `description` (String, required)
+- `category` (String, required)
+- `subcategory` (String)
+- `department` (ObjectId, ref: `Department`)
+- `submittedBy` (ObjectId, ref: `User`)
+- `isAnonymous` (Boolean, default: false)
+- `priority` (String, enum: `['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']`, default: `'MEDIUM'`)
+- `status` (String, enum: `['SUBMITTED', 'UNDER_REVIEW', 'IN_PROGRESS', 'RESOLVED', 'CLOSED', 'REJECTED', 'ESCALATED']`)
+- `assignedTo` (ObjectId, ref: `User`, assigned department officer)
+- `attachments` ([Object: `filename`, `originalName`, `mimetype`, `size`])
+- `aiClassification` (Object):
+  - `category` (String)
+  - `subcategory` (String)
+  - `department` (String)
+  - `departmentCode` (String)
+  - `priority` (String)
+  - `confidence` (Number)
+  - `reasoning` (String)
+  - `model` (String)
+  - `classifiedAt` (Date)
+- `isAiRouted` (Boolean, default: true)
+- `slaDeadline` (Date)
+- `isSlaBreach` (Boolean, default: false)
+- `escalatedAt` (Date)
+- `escalationReason` (String)
+- `history` ([Object: `previousStatus`, `newStatus`, `changedBy`, `remarks`, `timestamp`])
+- `comments` ([Object: `author`, `text`, `isInternal`, `createdAt`])
+- `feedback` (Object: `rating`, `comment`, `submittedAt`)
+- `timestamps` (`createdAt`, `updatedAt`)
 
-### 6. `grievances`
-Primary ledger storing filed complaints.
-- `id` (TEXT PRIMARY KEY) - Generated format: `GRV-YYYY-XXXXXX`
-- `title` (TEXT NOT NULL)
-- `description` (TEXT NOT NULL)
-- `citizen_id` (INTEGER NOT NULL) - Foreign Key `users(id)` ON DELETE CASCADE
-- `subcategory_id` (INTEGER NULL) - Foreign Key `subcategories(id)` ON DELETE SET NULL
-- `department_id` (INTEGER NULL) - Foreign Key `departments(id)` ON DELETE SET NULL
-- `assigned_officer_id` (INTEGER NULL) - Foreign Key `officers(id)` ON DELETE SET NULL
-- `priority` (TEXT NOT NULL) - Constraints: `LOW`, `MEDIUM`, `HIGH`, `CRITICAL`
-- `status` (TEXT NOT NULL) - Constraints: `SUBMITTED`, `ACKNOWLEDGED`, `ASSIGNED`, `UNDER REVIEW`, `IN PROGRESS`, `WAITING FOR CITIZEN`, `RESOLVED`, `CLOSED`, `REJECTED`, `ESCALATED`, `REOPENED`
-- `address` (TEXT NULL), `city` (TEXT NULL), `district` (TEXT NULL), `state` (TEXT NULL), `pincode` (TEXT NULL)
-- `latitude` (REAL NULL), `longitude` (REAL NULL)
-- `is_private` (INTEGER DEFAULT 0) - `1` to hide contact info from guest views, else `0`
-- `sla_deadline` (DATETIME NULL) - Target resolution deadline timestamp
-- `created_at` (DATETIME DEFAULT CURRENT_TIMESTAMP)
-- `updated_at` (DATETIME DEFAULT CURRENT_TIMESTAMP)
+---
 
-### 7. `grievance_history`
-Stores status transitions log timeline.
-- `id` (INTEGER PRIMARY KEY AUTOINCREMENT)
-- `grievance_id` (TEXT NOT NULL) - Foreign Key `grievances(id)` ON DELETE CASCADE
-- `previous_status` (TEXT NULL)
-- `new_status` (TEXT NOT NULL)
-- `changed_by` (INTEGER NULL) - Foreign Key `users(id)` ON DELETE SET NULL
-- `remarks` (TEXT NULL)
-- `timestamp` (DATETIME DEFAULT CURRENT_TIMESTAMP)
+### 4. `notifications` (`Notification.js`)
+Alerts sent to students, officers, and administrators.
+- `recipient` (ObjectId, ref: `User`, required)
+- `type` (String, enum: `['GRIEVANCE_SUBMITTED', 'STATUS_UPDATED', 'GRIEVANCE_ASSIGNED', 'SLA_BREACH', 'ESCALATED', 'NEW_COMMENT']`)
+- `title` (String, required)
+- `message` (String, required)
+- `grievance` (ObjectId, ref: `Grievance`)
+- `link` (String, navigation hash)
+- `isRead` (Boolean, default: false)
+- `timestamps` (`createdAt`, `updatedAt`)
 
-### 8. `grievance_comments`
-Discussion thread messaging logs.
-- `id` (INTEGER PRIMARY KEY AUTOINCREMENT)
-- `grievance_id` (TEXT NOT NULL) - Foreign Key `grievances(id)` ON DELETE CASCADE
-- `user_id` (INTEGER NULL) - Foreign Key `users(id)` ON DELETE SET NULL
-- `comment` (TEXT NOT NULL)
-- `is_internal` (INTEGER DEFAULT 0) - `1` if restricted to officers/admins, `0` for public
-- `created_at` (DATETIME DEFAULT CURRENT_TIMESTAMP)
+---
 
-### 9. `attachments`
-Evidence upload links.
-- `id` (INTEGER PRIMARY KEY AUTOINCREMENT)
-- `grievance_id` (TEXT NOT NULL) - Foreign Key `grievances(id)` ON DELETE CASCADE
-- `file_name` (TEXT NOT NULL), `file_path` (TEXT NOT NULL), `file_type` (TEXT NOT NULL), `file_size` (INTEGER NOT NULL)
-- `uploaded_at` (DATETIME DEFAULT CURRENT_TIMESTAMP)
-
-### 10. `notifications`
-In-app notification center logs.
-- `id` (INTEGER PRIMARY KEY AUTOINCREMENT)
-- `user_id` (INTEGER NOT NULL) - Foreign Key `users(id)` ON DELETE CASCADE
-- `grievance_id` (TEXT NULL) - Foreign Key `grievances(id)` ON DELETE SET NULL
-- `message` (TEXT NOT NULL)
-- `is_read` (INTEGER DEFAULT 0)
-- `created_at` (DATETIME DEFAULT CURRENT_TIMESTAMP)
-
-### 11. `escalations`
-SLA breach or officer-triggered escalations.
-- `id` (INTEGER PRIMARY KEY AUTOINCREMENT)
-- `grievance_id` (TEXT NOT NULL) - Foreign Key `grievances(id)` ON DELETE CASCADE
-- `escalated_from_officer_id` (INTEGER NULL) - Foreign Key `officers(id)` ON DELETE SET NULL
-- `escalated_to_admin_id` (INTEGER NULL) - Foreign Key `users(id)` ON DELETE SET NULL
-- `reason` (TEXT NOT NULL)
-- `status` (TEXT DEFAULT 'PENDING') - Constraints: `PENDING`, `RESOLVED`
-- `created_at` (DATETIME DEFAULT CURRENT_TIMESTAMP)
-
-### 12. `feedback`
-Citizen rating evaluations for resolved complaints.
-- `id` (INTEGER PRIMARY KEY AUTOINCREMENT)
-- `grievance_id` (TEXT NOT NULL UNIQUE) - Foreign Key `grievances(id)` ON DELETE CASCADE
-- `rating` (INTEGER NOT NULL) - Constraint: `1` to `5` stars
-- `comments` (TEXT NULL)
-- `created_at` (DATETIME DEFAULT CURRENT_TIMESTAMP)
-
-### 13. `audit_logs`
-Global security administrative log.
-- `id` (INTEGER PRIMARY KEY AUTOINCREMENT)
-- `user_id` (INTEGER NULL) - Foreign Key `users(id)` ON DELETE SET NULL
-- `action` (TEXT NOT NULL)
-- `entity_type` (TEXT NOT NULL), `entity_id` (TEXT NULL)
-- `metadata` (TEXT NULL) - JSON string data
-- `timestamp` (DATETIME DEFAULT CURRENT_TIMESTAMP)
+### 5. `audit_logs` (`AuditLog.js`)
+Immutable audit record for compliance and accountability.
+- `action` (String, required) - E.g., `GRIEVANCE_SUBMITTED`, `STATUS_UPDATED`, `ROLE_UPDATED`
+- `performedBy` (ObjectId, ref: `User`)
+- `targetEntity` (String)
+- `targetId` (ObjectId)
+- `metadata` (Object)
+- `timestamps` (`createdAt`)

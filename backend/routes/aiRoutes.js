@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { classifyWithGemini, chatWithGemini } = require('../services/geminiService');
 const { optionalAuth } = require('../middleware/authMiddleware');
+const Department = require('../models/Department');
 
 // 1. Post to classify text description
 router.post('/classify', optionalAuth, async (req, res) => {
@@ -14,24 +15,28 @@ router.post('/classify', optionalAuth, async (req, res) => {
   try {
     const suggestions = await classifyWithGemini(description);
     
-    // Fetch mapped subcategory/department details from DB to return matching IDs
-    const subcat = dbGetDetails(suggestions.subcategory, suggestions.category);
+    // Fetch matching department from MongoDB
+    const dept = await Department.findOne({
+      $or: [
+        { name: new RegExp(suggestions.department, 'i') },
+        { code: suggestions.departmentCode || '' }
+      ]
+    });
     
     res.json({
       ...suggestions,
-      subcategoryId: subcat ? subcat.id : null,
-      departmentId: subcat ? subcat.department_id : null
+      departmentId: dept ? dept._id : null,
+      departmentCode: dept ? dept.code : suggestions.departmentCode
     });
   } catch (error) {
     console.error('AI classification route error:', error);
     res.json({
-      category: 'Roads & Streets',
-      subcategory: 'Potholes on Main Road',
-      department: 'Roads & Infrastructure',
+      category: 'Academic Affairs',
+      subcategory: 'Examination Issues',
+      department: 'Academic Affairs',
       priority: 'MEDIUM',
-      confidence: 0.1,
-      subcategoryId: 5, // Seeds Pothole subcat
-      departmentId: 3   // Seeds Roads department
+      confidence: 0.5,
+      departmentId: null
     });
   }
 });
@@ -52,21 +57,5 @@ router.post('/chat', optionalAuth, async (req, res) => {
     res.status(500).json({ error: 'Server error processing chatbot query.' });
   }
 });
-
-// Helper to resolve subcategory name to database primary key IDs
-function dbGetDetails(subName, catName) {
-  try {
-    const { db } = require('../config/db');
-    return db.prepare(`
-      SELECT s.id, s.department_id 
-      FROM subcategories s
-      JOIN categories c ON s.category_id = c.id
-      WHERE s.name = ? OR s.name LIKE ?
-      LIMIT 1
-    `).get(subName, `%${subName}%`);
-  } catch (err) {
-    return null;
-  }
-}
 
 module.exports = router;

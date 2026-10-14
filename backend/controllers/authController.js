@@ -1,171 +1,151 @@
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const { db } = require('../config/db');
-const { JWT_SECRET } = require('../middleware/authMiddleware');
+const User = require('../models/User');
+const AuditLog = require('../models/AuditLog');
+const { generateToken } = require('../middleware/authMiddleware');
 
-// 1. Citizen Registration
-function register(req, res) {
-  const { email, password, name, phone } = req.body;
-
-  if (!email || !password || !name) {
-    return res.status(400).json({ error: 'Email, password, and name are required.' });
-  }
-
+// POST /api/auth/register
+exports.register = async (req, res) => {
   try {
-    // Check if user already exists
-    const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
+    const { name, email, password, phone, studentId, department, year, section } = req.body;
+
+    if (!name || !email || !password) {
+      return res.status(400).json({ error: 'Name, email, and password are required.' });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters.' });
+    }
+
+    const existing = await User.findOne({ email: email.toLowerCase() });
     if (existing) {
       return res.status(400).json({ error: 'An account with this email already exists.' });
     }
 
-    // Hash password
-    const passwordHash = bcrypt.hashSync(password, 10);
+    const user = await User.create({
+      name, email, password, phone,
+      studentId, department, year, section,
+      role: 'student'
+    });
 
-    // Insert user as citizen
-    const insertStmt = db.prepare(`
-      INSERT INTO users (email, password_hash, name, role, phone)
-      VALUES (?, ?, ?, 'citizen', ?)
-    `);
-    const result = insertStmt.run(email, passwordHash, name, phone || null);
+    await AuditLog.create({
+      action: 'USER_REGISTERED',
+      performedBy: user._id,
+      targetEntity: 'user',
+      targetId: user._id,
+      metadata: { email, name, role: 'student' }
+    });
 
-    const userId = result.lastInsertRowid;
+    const token = generateToken(user._id);
 
-    // Create Audit Log
-    db.prepare(`
-      INSERT INTO audit_logs (user_id, action, entity_type, entity_id, metadata)
-      VALUES (?, 'REGISTER_CITIZEN', 'user', ?, ?)
-    `).run(userId, userId.toString(), JSON.stringify({ email, name }));
-
-    // Generate JWT
-    const token = jwt.sign(
-      { id: userId, email, role: 'citizen', name },
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-
-    res.status(211).json({
-      message: 'Registration successful!',
+    res.status(201).json({
+      message: 'Registration successful! Welcome to the College Grievance Portal.',
       token,
-      user: { id: userId, email, role: 'citizen', name, phone: phone || null }
+      user: user.toJSON()
     });
   } catch (error) {
-    console.error('Registration error:', error);
-    res.status(500).json({ error: 'Server error during registration. Please try again.' });
+    console.error('[Auth] Register error:', error);
+    res.status(500).json({ error: 'Server error during registration.' });
   }
-}
+};
 
-// 2. User Login
-function login(req, res) {
-  const { email, password } = req.body;
-
-  if (!email || !password) {
-    return res.status(400).json({ error: 'Email and password are required.' });
-  }
-
+// POST /api/auth/login
+exports.login = async (req, res) => {
   try {
-    const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
-    if (!user) {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required.' });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase() })
+      .populate('assignedDepartment', 'name code');
+
+    if (!user || !user.isActive) {
       return res.status(401).json({ error: 'Invalid email or password.' });
     }
 
-    const passwordMatch = bcrypt.compareSync(password, user.password_hash);
-    if (!passwordMatch) {
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) {
       return res.status(401).json({ error: 'Invalid email or password.' });
     }
 
-    // Prepare token payload
-    const payload = {
-      id: user.id,
-      email: user.email,
-      role: user.role,
-      name: user.name
-    };
+    // Update last login
+    user.lastLogin = new Date();
+    await user.save({ validateBeforeSave: false });
 
-    // If officer, find officer designation and department
-    let officerDetails = null;
-    if (user.role === 'officer') {
-      const officer = db.prepare(`
-        SELECT o.id as officer_id, o.designation, d.id as department_id, d.name as department_name
-        FROM officers o
-        LEFT JOIN departments d ON o.department_id = d.id
-        WHERE o.user_id = ?
-      `).get(user.id);
-      
-      if (officer) {
-        officerDetails = officer;
-        payload.officerId = officer.officer_id;
-        payload.departmentId = officer.department_id;
-      }
-    }
+    await AuditLog.create({
+      action: 'USER_LOGIN',
+      performedBy: user._id,
+      targetEntity: 'user',
+      targetId: user._id,
+      ipAddress: req.ip
+    });
 
-    // Create Audit Log for login
-    db.prepare(`
-      INSERT INTO audit_logs (user_id, action, entity_type, entity_id)
-      VALUES (?, 'LOGIN', 'user', ?)
-    `).run(user.id, user.id.toString());
-
-    // Sign Token
-    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
+    const token = generateToken(user._id);
 
     res.json({
       message: 'Login successful!',
       token,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        phone: user.phone,
-        officer: officerDetails
-      }
+      user: user.toJSON()
     });
   } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ error: 'Server error during login. Please try again.' });
+    console.error('[Auth] Login error:', error);
+    res.status(500).json({ error: 'Server error during login.' });
   }
-}
+};
 
-// 3. Get current session info (Me)
-function getMe(req, res) {
+// GET /api/auth/me
+exports.getMe = async (req, res) => {
   try {
-    const user = db.prepare('SELECT id, email, name, role, phone, created_at FROM users WHERE id = ?').get(req.user.id);
-    if (!user) {
-      return res.status(404).json({ error: 'User profile not found.' });
-    }
-
-    let officerDetails = null;
-    if (user.role === 'officer') {
-      const officer = db.prepare(`
-        SELECT o.id as officer_id, o.designation, d.id as department_id, d.name as department_name
-        FROM officers o
-        LEFT JOIN departments d ON o.department_id = d.id
-        WHERE o.user_id = ?
-      `).get(user.id);
-      
-      if (officer) {
-        officerDetails = officer;
-      }
-    }
-
-    res.json({
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        phone: user.phone,
-        created_at: user.created_at,
-        officer: officerDetails
-      }
-    });
+    const user = await User.findById(req.user._id)
+      .select('-password')
+      .populate('assignedDepartment', 'name code');
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    res.json({ user });
   } catch (error) {
-    console.error('Get profile error:', error);
-    res.status(500).json({ error: 'Server error fetching user profile.' });
+    res.status(500).json({ error: 'Server error fetching profile.' });
   }
-}
+};
 
-module.exports = {
-  register,
-  login,
-  getMe
+// PATCH /api/auth/profile
+exports.updateProfile = async (req, res) => {
+  try {
+    const { name, phone, studentId, department, year, section } = req.body;
+    const allowedUpdates = { name, phone, studentId, department, year, section };
+    Object.keys(allowedUpdates).forEach(k => allowedUpdates[k] === undefined && delete allowedUpdates[k]);
+
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      allowedUpdates,
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    res.json({ message: 'Profile updated successfully.', user });
+  } catch (error) {
+    res.status(500).json({ error: 'Server error updating profile.' });
+  }
+};
+
+// POST /api/auth/change-password
+exports.changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Current and new passwords are required.' });
+    }
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: 'New password must be at least 6 characters.' });
+    }
+
+    const user = await User.findById(req.user._id);
+    const isMatch = await user.comparePassword(currentPassword);
+    if (!isMatch) {
+      return res.status(400).json({ error: 'Current password is incorrect.' });
+    }
+
+    user.password = newPassword;
+    await user.save();
+
+    res.json({ message: 'Password changed successfully.' });
+  } catch (error) {
+    res.status(500).json({ error: 'Server error changing password.' });
+  }
 };

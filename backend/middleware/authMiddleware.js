@@ -1,68 +1,60 @@
 const jwt = require('jsonwebtoken');
+const User = require('../models/User');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'grievance-portal-jwt-secret-key-2026';
+const JWT_SECRET = process.env.JWT_SECRET || 'college_grievance_portal_secret_2024';
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
-// Middleware to authenticate JWT token
-function authenticateJWT(req, res, next) {
+const generateToken = (userId) => {
+  return jwt.sign({ id: userId }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+};
+
+const authenticateJWT = async (req, res, next) => {
   const authHeader = req.headers.authorization;
-
-  if (authHeader) {
-    // Expected format: "Bearer <token>"
-    const token = authHeader.split(' ')[1];
-
-    if (!token) {
-      return res.status(401).json({ error: 'Authentication token format is invalid.' });
-    }
-
-    jwt.verify(token, JWT_SECRET, (err, user) => {
-      if (err) {
-        return res.status(403).json({ error: 'Session expired or token is invalid. Please login again.' });
-      }
-
-      req.user = user;
-      next();
-    });
-  } else {
-    res.status(401).json({ error: 'Authentication is required to access this resource.' });
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Access denied. No token provided.' });
   }
-}
 
-// Middleware to authorize specific roles
-function authorizeRoles(...allowedRoles) {
-  return (req, res, next) => {
-    if (!req.user) {
-      return res.status(401).json({ error: 'Authentication is required.' });
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const user = await User.findById(decoded.id).select('-password').populate('assignedDepartment', 'name code');
+    if (!user || !user.isActive) {
+      return res.status(401).json({ error: 'Invalid or expired token.' });
     }
+    req.user = user;
+    next();
+  } catch (error) {
+    return res.status(401).json({ error: 'Invalid or expired token.' });
+  }
+};
 
-    if (!allowedRoles.includes(req.user.role)) {
-      return res.status(403).json({ 
-        error: `Access Denied: You do not have permission. Required role: ${allowedRoles.join(' or ')}.` 
+const authorizeRoles = (...roles) => {
+  return (req, res, next) => {
+    if (!roles.includes(req.user.role)) {
+      return res.status(403).json({
+        error: `Access denied. Required role(s): ${roles.join(', ')}`
       });
     }
-
     next();
   };
-}
+};
 
-// Middleware for optional authentication (populates req.user if token exists, but does not block)
-function optionalAuth(req, res, next) {
+// Optional auth - doesn't fail if no token
+const optionalAuth = async (req, res, next) => {
   const authHeader = req.headers.authorization;
-  if (authHeader) {
-    const token = authHeader.split(' ')[1];
-    if (token) {
-      jwt.verify(token, JWT_SECRET, (err, user) => {
-        if (!err) req.user = user;
-        next();
-      });
-      return;
-    }
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    req.user = null;
+    return next();
+  }
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const user = await User.findById(decoded.id).select('-password');
+    req.user = user || null;
+  } catch (_) {
+    req.user = null;
   }
   next();
-}
-
-module.exports = {
-  authenticateJWT,
-  optionalAuth,
-  authorizeRoles,
-  JWT_SECRET
 };
+
+module.exports = { authenticateJWT, authorizeRoles, optionalAuth, generateToken, JWT_SECRET };

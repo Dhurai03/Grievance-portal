@@ -1,17 +1,21 @@
-# REST API Endpoint Documentation - JanSuniye
+# REST API Documentation - EduGrieve
 
-The backend Express application exposes the following REST API endpoints under the `/api` namespace. All authenticated requests require a valid JWT Bearer Token in the `Authorization` header:
-`Authorization: Bearer <JWT_TOKEN>`
+The EduGrieve backend exposes the following RESTful API endpoints under `/api`. All authenticated endpoints require a valid JWT Bearer token:
+```
+Authorization: Bearer <token>
+```
 
 ---
 
 ## 1. Authentication (`/api/auth`)
 
-| Endpoint | Method | Auth Required | Description |
+| Endpoint | Method | Auth | Description |
 |---|---|---|---|
-| `/register` | POST | None | Creates a new Citizen user account. Returns a JWT session token. |
-| `/login` | POST | None | Authenticates credentials. Returns user profile details and a JWT token. |
-| `/me` | GET | Token | Decodes the JWT token and returns the current user profile. |
+| `/register` | POST | Public | Register a new student or faculty account |
+| `/login` | POST | Public | Authenticate user and receive JWT session token |
+| `/me` | GET | Token | Retrieve the logged-in user's profile |
+| `/profile` | PATCH | Token | Update profile information (name, phone, department) |
+| `/change-password` | POST | Token | Securely update password with current verification |
 
 ---
 
@@ -19,66 +23,58 @@ The backend Express application exposes the following REST API endpoints under t
 
 | Endpoint | Method | Auth / Role | Description |
 |---|---|---|---|
-| `/` | GET | Token | Lists grievances. Filtered by role (citizens see theirs, officers see department/assigned, admins see all). Filters: `status`, `priority`, `categoryId`, `departmentId`, `search`, `isBreached`. |
-| `/` | POST | Token / Citizen | Files a new grievance. Auto-assigns department and computes SLA. |
-| `/:id` | GET | Token | Fetches details, timelines, attachments, comments, and ratings feedback. |
-| `/:id/status` | PATCH | Token | Updates ticket lifecycle status. Citizens can only Reopen or Close. |
-| `/:id/comments` | POST | Token | Appends discussion comments. Officers can mark comments as internal. |
-| `/:id/feedback` | POST | Token / Citizen | Rates a resolved ticket (1-5 stars), triggers auto-close. |
-| `/:id/assign` | POST | Token / Officer / Admin | Routes/assigns ticket to department or executive officer. |
-| `/:id/escalate` | POST | Token / Officer | Manually escalates a ticket to admin attention. |
-| `/:id/attachments` | POST | Token | Uploads up to 5 attachments via Multer. |
+| `/` | POST | Student | Submit new complaint with auto NLP department routing & file uploads |
+| `/` | GET | Token | List grievances (role-scoped, supports status, priority, search filters) |
+| `/:id` | GET | Token | Fetch complete grievance record, history log, comments & attachments |
+| `/track/:trackingId` | GET | Public | Public grievance lookup by tracking code (`EDU-2026-XXXX`) |
+| `/:id/status` | PATCH | Officer / Admin | Update resolution stage (`UNDER_REVIEW`, `IN_PROGRESS`, `RESOLVED`, etc.) |
+| `/:id/comments` | POST | Token | Add discussion comment (officers can flag internal notes) |
+| `/:id/feedback` | POST | Student | Submit satisfaction rating (1-5 stars) on resolved grievance |
+| `/:id/assign` | PATCH | Admin / Dean | Assign grievance to a designated department officer |
+| `/ai-classify` | POST | Token | Live NLP/Gemini classification preview for text descriptions |
 
 ---
 
-## 3. Departments (`/api/departments`)
-
-| Endpoint | Method | Auth / Role | Description |
-|---|---|---|---|
-| `/` | GET | Token | Lists all active departments. |
-| `/` | POST | Token / Admin | Creates a new municipal department. |
-| `/:id` | PUT | Token / Admin | Updates department attributes. |
-| `/:id` | DELETE | Token / Admin | Removes a department. |
-
----
-
-## 4. Categories & SLAs (`/api/categories`)
-
-| Endpoint | Method | Auth / Role | Description |
-|---|---|---|---|
-| `/` | GET | Token | Fetch categories and subcategories tree. |
-| `/` | POST | Token / Admin | Creates a new parent category. |
-| `/:id` | DELETE | Token / Admin | Deletes category and nested subcategories. |
-| `/:categoryId/subcategories` | POST | Token / Admin | Adds a subcategory, linking routing and SLA days. |
-| `/subcategories/:id` | PUT | Token / Admin | Modifies subcategory routing department and SLA days. |
-| `/subcategories/:id` | DELETE | Token / Admin | Deletes a subcategory. |
-
----
-
-## 5. System Analytics (`/api/analytics`)
-
-| Endpoint | Method | Auth / Role | Description |
-|---|---|---|---|
-| `/admin` | GET | Token / Admin | Returns overall metrics, monthly submissions lines, category shares, and department tables. |
-| `/officer` | GET | Token / Officer | Returns officer assigned counts, due soon queues, and department stats. |
-| `/citizen` | GET | Token / Citizen | Returns citizen personal complaint status summaries. |
-
----
-
-## 6. Notifications (`/api/notifications`)
+## 3. AI Assistant & Routing (`/api/ai`)
 
 | Endpoint | Method | Auth | Description |
 |---|---|---|---|
-| `/` | GET | Token | Fetch active user in-app notifications list (limit 100). |
-| `/:id/read` | PATCH | Token | Mark notification as read. |
+| `/classify` | POST | Optional | Classify complaint text into category, subcategory, priority, & department |
+| `/chat` | POST | Optional | Conversational assistant providing advice, drafting tips, & SLA guidance |
 
 ---
 
-## 7. AI Suggestions & Promotions (`/api/admin`, `/api/ai`)
+## 4. Departments (`/api/departments`)
 
 | Endpoint | Method | Auth / Role | Description |
 |---|---|---|---|
-| `/ai/classify` | POST | Token | Parsers input text description to predict category, department, and priority. |
-| `/admin/users` | GET | Token / Admin | Lists all user records, designations, and roles. |
-| `/admin/users/:id/role` | PATCH | Token / Admin | Promotes user roles and maps officer designations. |
-| `/admin/audit-logs` | GET | Token / Admin | Returns security audit log logs list. |
+| `/` | GET | Token | List all active college departments and assigned officers |
+| `/:id` | GET | Token | Retrieve specific department information |
+| `/` | POST | Admin | Create a new department with custom SLA hours |
+| `/:id` | PATCH | Admin | Update department details, contact email, and SLA configuration |
+| `/:id/officers` | POST | Admin | Assign an officer or department head |
+
+---
+
+## 5. Notifications (`/api/notifications`)
+
+| Endpoint | Method | Auth | Description |
+|---|---|---|---|
+| `/` | GET | Token | Retrieve user notifications and alerts |
+| `/:id/read` | PATCH | Token | Mark a single notification as read |
+| `/mark-all-read` | PATCH | Token | Mark all user notifications as read |
+
+---
+
+## 6. Administration & Analytics (`/api/analytics`)
+
+| Endpoint | Method | Auth / Role | Description |
+|---|---|---|---|
+| `/overview` | GET | Admin / Dean | Campus overview (total, status distribution, resolution rate, breaches) |
+| `/by-department` | GET | Admin / Dean | Grievance volume and resolution rate per department |
+| `/by-priority` | GET | Admin / Dean | Grievances distributed across Low, Med, High, and Critical |
+| `/by-category` | GET | Admin / Dean | Breakdown by category |
+| `/monthly-trend` | GET | Admin / Dean | Monthly submission volume history |
+| `/users` | GET | Admin / Dean | List registered users with role and department filters |
+| `/users/:id/role` | PATCH | Admin | Update a user's role (student, officer, faculty, dean, admin) |
+| `/audit-logs` | GET | Admin / Dean | Immutable system security and activity log |

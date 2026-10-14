@@ -1,244 +1,195 @@
-const { db } = require('../config/db');
+const Grievance = require('../models/Grievance');
+const User = require('../models/User');
+const Department = require('../models/Department');
+const AuditLog = require('../models/AuditLog');
 
-// 1. Admin Dashboard Analytics
-function getAdminAnalytics(req, res) {
+// GET /api/analytics/overview (admin/dean)
+exports.getOverview = async (req, res) => {
   try {
-    const totalCount = db.prepare('SELECT COUNT(*) as count FROM grievances').get().count;
-    
-    if (totalCount === 0) {
-      return res.json({
-        metrics: { total: 0, pending: 0, resolved: 0, closed: 0, resolutionRate: 0, avgResolutionDays: 0, slaCompliance: 100, escalated: 0 },
-        trends: [],
-        categories: [],
-        departments: [],
-        geographic: []
-      });
-    }
+    const [
+      totalGrievances,
+      submitted,
+      underReview,
+      inProgress,
+      resolved,
+      closed,
+      rejected,
+      escalated,
+      totalUsers,
+      totalStudents,
+      slaBreaches
+    ] = await Promise.all([
+      Grievance.countDocuments(),
+      Grievance.countDocuments({ status: 'SUBMITTED' }),
+      Grievance.countDocuments({ status: 'UNDER_REVIEW' }),
+      Grievance.countDocuments({ status: 'IN_PROGRESS' }),
+      Grievance.countDocuments({ status: 'RESOLVED' }),
+      Grievance.countDocuments({ status: 'CLOSED' }),
+      Grievance.countDocuments({ status: 'REJECTED' }),
+      Grievance.countDocuments({ status: 'ESCALATED' }),
+      User.countDocuments(),
+      User.countDocuments({ role: 'student' }),
+      Grievance.countDocuments({ isSlaBreach: true })
+    ]);
 
-    // Pending vs Resolved
-    const pendingCount = db.prepare(`
-      SELECT COUNT(*) as count FROM grievances 
-      WHERE status NOT IN ('RESOLVED', 'CLOSED', 'REJECTED')
-    `).get().count;
-
-    const resolvedCount = db.prepare(`
-      SELECT COUNT(*) as count FROM grievances 
-      WHERE status IN ('RESOLVED', 'CLOSED')
-    `).get().count;
-
-    const closedCount = db.prepare("SELECT COUNT(*) as count FROM grievances WHERE status = 'CLOSED'").get().count;
-    const escalatedCount = db.prepare("SELECT COUNT(*) as count FROM grievances WHERE status = 'ESCALATED'").get().count;
-
-    const resolutionRate = totalCount > 0 ? Math.round((resolvedCount / totalCount) * 100) : 0;
-
-    // Average Resolution Time (in days)
-    // We calculate from created_at to the date status first changed to RESOLVED
-    const avgRes = db.prepare(`
-      SELECT AVG(julianday(updated_at) - julianday(created_at)) as avg_days 
-      FROM grievances 
-      WHERE status IN ('RESOLVED', 'CLOSED')
-    `).get();
-    
-    const avgResolutionDays = avgRes.avg_days ? Math.round(avgRes.avg_days * 10) / 10 : 0;
-
-    // SLA Compliance: resolved cases resolved before SLA deadline
-    const slaResolvedCount = db.prepare(`
-      SELECT COUNT(*) as count FROM grievances 
-      WHERE status IN ('RESOLVED', 'CLOSED') AND updated_at <= sla_deadline
-    `).get().count;
-    const slaCompliance = resolvedCount > 0 ? Math.round((slaResolvedCount / resolvedCount) * 100) : 100;
-
-    // Trends: monthly submissions count (last 6 months)
-    const trends = db.prepare(`
-      SELECT strftime('%Y-%m', created_at) as month, COUNT(*) as count 
-      FROM grievances 
-      GROUP BY month 
-      ORDER BY month DESC 
-      LIMIT 6
-    `).all().reverse();
-
-    // Categories Distribution
-    const categories = db.prepare(`
-      SELECT c.name, COUNT(g.id) as count 
-      FROM grievances g
-      JOIN subcategories s ON g.subcategory_id = s.id
-      JOIN categories c ON s.category_id = c.id
-      GROUP BY c.id
-    `).all();
-
-    // Department Performance
-    const departments = db.prepare(`
-      SELECT 
-        d.id,
-        d.name,
-        COUNT(g.id) as total,
-        SUM(CASE WHEN g.status IN ('RESOLVED', 'CLOSED') THEN 1 ELSE 0 END) as resolved,
-        SUM(CASE WHEN g.status NOT IN ('RESOLVED', 'CLOSED', 'REJECTED') THEN 1 ELSE 0 END) as pending,
-        SUM(CASE WHEN g.status NOT IN ('RESOLVED', 'CLOSED') AND g.sla_deadline < CURRENT_TIMESTAMP THEN 1 ELSE 0 END) as breached,
-        SUM(CASE WHEN g.status IN ('RESOLVED', 'CLOSED') AND g.updated_at <= g.sla_deadline THEN 1 ELSE 0 END) as compliant_resolved
-      FROM departments d
-      LEFT JOIN grievances g ON d.id = g.department_id
-      GROUP BY d.id
-      ORDER BY total DESC
-    `).all().map(dept => {
-      const compliantResolved = dept.compliant_resolved || 0;
-      const resolved = dept.resolved || 0;
-      const slaPercentage = resolved > 0 ? Math.round((compliantResolved / resolved) * 100) : 100;
-      return {
-        id: dept.id,
-        name: dept.name,
-        total: dept.total || 0,
-        resolved: dept.resolved || 0,
-        pending: dept.pending || 0,
-        breached: dept.breached || 0,
-        slaPercentage
-      };
-    });
-
-    // Geographic analysis
-    const geographic = db.prepare(`
-      SELECT district, city, COUNT(*) as count 
-      FROM grievances 
-      WHERE district IS NOT NULL AND district != ''
-      GROUP BY district, city
-      ORDER BY count DESC
-    `).all();
+    const resolutionRate = totalGrievances > 0
+      ? Math.round(((resolved + closed) / totalGrievances) * 100)
+      : 0;
 
     res.json({
-      metrics: {
-        total: totalCount,
-        pending: pendingCount,
-        resolved: resolvedCount,
-        closed: closedCount,
-        resolutionRate,
-        avgResolutionDays,
-        slaCompliance,
-        escalated: escalatedCount
-      },
-      trends,
-      categories,
-      departments,
-      geographic
-    });
-  } catch (error) {
-    console.error('Fetch admin analytics error:', error);
-    res.status(500).json({ error: 'Server error compiling dashboard analytics.' });
-  }
-}
-
-// 2. Department Officer Stats
-function getOfficerStats(req, res) {
-  try {
-    // Find officer department and id
-    const officer = db.prepare('SELECT id, department_id FROM officers WHERE user_id = ?').get(req.user.id);
-    if (!officer) {
-      return res.status(404).json({ error: 'Officer profile details not found.' });
-    }
-
-    const { id: officerId, department_id: departmentId } = officer;
-
-    // Assigned to Me
-    const assignedCount = db.prepare('SELECT COUNT(*) as count FROM grievances WHERE assigned_officer_id = ?').get(officerId).count;
-    
-    // Pending assigned
-    const pendingCount = db.prepare(`
-      SELECT COUNT(*) as count FROM grievances 
-      WHERE assigned_officer_id = ? AND status NOT IN ('RESOLVED', 'CLOSED', 'REJECTED')
-    `).get(officerId).count;
-
-    // In Progress assigned
-    const progressCount = db.prepare(`
-      SELECT COUNT(*) as count FROM grievances 
-      WHERE assigned_officer_id = ? AND status = 'IN PROGRESS'
-    `).get(officerId).count;
-
-    // Resolved assigned
-    const resolvedCount = db.prepare(`
-      SELECT COUNT(*) as count FROM grievances 
-      WHERE assigned_officer_id = ? AND status IN ('RESOLVED', 'CLOSED')
-    `).get(officerId).count;
-
-    // SLA Breached assigned
-    const breachedCount = db.prepare(`
-      SELECT COUNT(*) as count FROM grievances 
-      WHERE assigned_officer_id = ? AND status NOT IN ('RESOLVED', 'CLOSED', 'REJECTED') AND sla_deadline < CURRENT_TIMESTAMP
-    `).get(officerId).count;
-
-    // Due Soon (Pending assigned with less than 24 hours remaining)
-    const dueSoonCount = db.prepare(`
-      SELECT COUNT(*) as count FROM grievances 
-      WHERE assigned_officer_id = ? 
-        AND status NOT IN ('RESOLVED', 'CLOSED', 'REJECTED') 
-        AND sla_deadline >= CURRENT_TIMESTAMP
-        AND (julianday(sla_deadline) - julianday(CURRENT_TIMESTAMP)) <= 1.0
-    `).get(officerId).count;
-
-    // Department Stats (to show in officer dashboard sidebar)
-    const deptTotal = db.prepare('SELECT COUNT(*) as count FROM grievances WHERE department_id = ?').get(departmentId).count;
-    const deptUnassigned = db.prepare('SELECT COUNT(*) as count FROM grievances WHERE department_id = ? AND assigned_officer_id IS NULL').get(departmentId).count;
-    const deptResolved = db.prepare("SELECT COUNT(*) as count FROM grievances WHERE department_id = ? AND status IN ('RESOLVED', 'CLOSED')").get(departmentId).count;
-
-    res.json({
-      officer: {
-        assigned: assignedCount,
-        pending: pendingCount,
-        inProgress: progressCount,
-        resolved: resolvedCount,
-        breached: breachedCount,
-        dueSoon: dueSoonCount
-      },
-      department: {
-        total: deptTotal,
-        unassigned: deptUnassigned,
-        resolved: deptResolved
+      overview: {
+        totalGrievances,
+        byStatus: { submitted, underReview, inProgress, resolved, closed, rejected, escalated },
+        totalUsers, totalStudents, slaBreaches, resolutionRate
       }
     });
   } catch (error) {
-    console.error('Fetch officer stats error:', error);
-    res.status(500).json({ error: 'Server error compiling officer statistics.' });
+    res.status(500).json({ error: 'Error fetching analytics overview.' });
   }
-}
+};
 
-// 3. Citizen Stats
-function getCitizenStats(req, res) {
+// GET /api/analytics/by-department
+exports.getByDepartment = async (req, res) => {
   try {
-    const total = db.prepare('SELECT COUNT(*) as count FROM grievances WHERE citizen_id = ?').get(req.user.id).count;
-    
-    const pending = db.prepare(`
-      SELECT COUNT(*) as count FROM grievances 
-      WHERE citizen_id = ? AND status NOT IN ('RESOLVED', 'CLOSED', 'REJECTED')
-    `).get(req.user.id).count;
+    const deptStats = await Grievance.aggregate([
+      { $match: { department: { $ne: null } } },
+      {
+        $group: {
+          _id: '$department',
+          total: { $sum: 1 },
+          resolved: { $sum: { $cond: [{ $in: ['$status', ['RESOLVED', 'CLOSED']] }, 1, 0] } },
+          escalated: { $sum: { $cond: [{ $eq: ['$status', 'ESCALATED'] }, 1, 0] } },
+          avgRating: { $avg: '$feedback.rating' }
+        }
+      },
+      {
+        $lookup: { from: 'departments', localField: '_id', foreignField: '_id', as: 'dept' }
+      },
+      { $unwind: { path: '$dept', preserveNullAndEmptyArrays: true } },
+      { $sort: { total: -1 } }
+    ]);
 
-    const inProgress = db.prepare(`
-      SELECT COUNT(*) as count FROM grievances 
-      WHERE citizen_id = ? AND status = 'IN PROGRESS'
-    `).get(req.user.id).count;
-
-    const resolved = db.prepare(`
-      SELECT COUNT(*) as count FROM grievances 
-      WHERE citizen_id = ? AND status IN ('RESOLVED', 'CLOSED')
-    `).get(req.user.id).count;
-
-    const closed = db.prepare(`
-      SELECT COUNT(*) as count FROM grievances 
-      WHERE citizen_id = ? AND status = 'CLOSED'
-    `).get(req.user.id).count;
-
-    res.json({
-      total,
-      pending,
-      inProgress,
-      resolved,
-      closed
-    });
+    res.json({ deptStats });
   } catch (error) {
-    console.error('Fetch citizen stats error:', error);
-    res.status(500).json({ error: 'Server error compiling citizen statistics.' });
+    res.status(500).json({ error: 'Error fetching department stats.' });
   }
-}
+};
 
-module.exports = {
-  getAdminAnalytics,
-  getOfficerStats,
-  getCitizenStats
+// GET /api/analytics/by-priority
+exports.getByPriority = async (req, res) => {
+  try {
+    const priorityStats = await Grievance.aggregate([
+      { $group: { _id: '$priority', count: { $sum: 1 } } },
+      { $sort: { count: -1 } }
+    ]);
+    res.json({ priorityStats });
+  } catch (error) {
+    res.status(500).json({ error: 'Error fetching priority stats.' });
+  }
+};
+
+// GET /api/analytics/by-category
+exports.getByCategory = async (req, res) => {
+  try {
+    const categoryStats = await Grievance.aggregate([
+      { $group: { _id: '$category', count: { $sum: 1 } } },
+      { $sort: { count: -1 } }
+    ]);
+    res.json({ categoryStats });
+  } catch (error) {
+    res.status(500).json({ error: 'Error fetching category stats.' });
+  }
+};
+
+// GET /api/analytics/monthly-trend
+exports.getMonthlyTrend = async (req, res) => {
+  try {
+    const trend = await Grievance.aggregate([
+      {
+        $group: {
+          _id: {
+            year: { $year: '$createdAt' },
+            month: { $month: '$createdAt' }
+          },
+          submitted: { $sum: 1 },
+          resolved: { $sum: { $cond: [{ $in: ['$status', ['RESOLVED', 'CLOSED']] }, 1, 0] } }
+        }
+      },
+      { $sort: { '_id.year': 1, '_id.month': 1 } },
+      { $limit: 12 }
+    ]);
+    res.json({ trend });
+  } catch (error) {
+    res.status(500).json({ error: 'Error fetching monthly trend.' });
+  }
+};
+
+// GET /api/analytics/audit-logs (admin)
+exports.getAuditLogs = async (req, res) => {
+  try {
+    const logs = await AuditLog.find()
+      .populate('performedBy', 'name email role')
+      .sort({ createdAt: -1 })
+      .limit(200);
+    res.json({ logs });
+  } catch (error) {
+    res.status(500).json({ error: 'Error fetching audit logs.' });
+  }
+};
+
+// GET /api/analytics/users (admin)
+exports.getUsers = async (req, res) => {
+  try {
+    const { role, search, page = 1, limit = 20 } = req.query;
+    const query = {};
+    if (role) query.role = role;
+    if (search) query.$or = [
+      { name: { $regex: search, $options: 'i' } },
+      { email: { $regex: search, $options: 'i' } },
+      { studentId: { $regex: search, $options: 'i' } }
+    ];
+
+    const [users, total] = await Promise.all([
+      User.find(query)
+        .select('-password')
+        .populate('assignedDepartment', 'name code')
+        .sort({ createdAt: -1 })
+        .skip((parseInt(page) - 1) * parseInt(limit))
+        .limit(parseInt(limit)),
+      User.countDocuments(query)
+    ]);
+
+    res.json({ users, total, page: parseInt(page) });
+  } catch (error) {
+    res.status(500).json({ error: 'Error fetching users.' });
+  }
+};
+
+// PATCH /api/analytics/users/:id/role (admin)
+exports.updateUserRole = async (req, res) => {
+  try {
+    const { role, assignedDepartment, designation } = req.body;
+    const validRoles = ['student', 'faculty', 'officer', 'admin', 'dean'];
+    if (!validRoles.includes(role)) return res.status(400).json({ error: 'Invalid role.' });
+
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { role, assignedDepartment: assignedDepartment || null, designation: designation || '' },
+      { new: true }
+    ).select('-password').populate('assignedDepartment', 'name code');
+
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+
+    await AuditLog.create({
+      action: 'USER_ROLE_UPDATED',
+      performedBy: req.user._id,
+      targetEntity: 'user',
+      targetId: user._id,
+      metadata: { newRole: role, designation }
+    });
+
+    res.json({ message: `User role updated to ${role}.`, user });
+  } catch (error) {
+    res.status(500).json({ error: 'Error updating user role.' });
+  }
 };

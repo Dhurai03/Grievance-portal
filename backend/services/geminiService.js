@@ -7,7 +7,7 @@ let genAI = null;
 if (API_KEY) {
   try {
     genAI = new GoogleGenerativeAI(API_KEY);
-    console.log('[Gemini SDK] Live Google Gemini API client initialized.');
+    console.log('[Gemini SDK] Live Google Gemini API client initialized for College Grievance Portal.');
   } catch (error) {
     console.error('[Gemini SDK] Initialization error:', error);
   }
@@ -18,7 +18,7 @@ if (API_KEY) {
  */
 async function classifyWithGemini(description) {
   if (!genAI) {
-    console.log('[Gemini SDK] Running local keyword classifier (GEMINI_API_KEY missing).');
+    console.log('[Gemini SDK] Running local NLP classifier (GEMINI_API_KEY missing).');
     return classifyGrievance(description);
   }
 
@@ -28,53 +28,71 @@ async function classifyWithGemini(description) {
       generationConfig: { responseMimeType: "application/json" }
     });
 
-    const prompt = `You are a municipal grievance classifier. Your task is to analyze the grievance description provided by the citizen and map it to one of the configured categories, subcategories, departments, and priorities.
+    const prompt = `You are an AI-enabled College Grievance Routing Engine for EduGrieve Campus Portal.
+Analyze the student grievance description and map it to the correct department, category, subcategory, priority, and department code.
 
-Available configurations:
-1. Category: 'Water Supply'
-   - Subcategory: 'Water Pipe Leakage' (Department: 'Water Supply', SLA: 3 days)
-   - Subcategory: 'Dirty Water Supply' (Department: 'Water Supply', SLA: 2 days)
-2. Category: 'Electricity & Power'
-   - Subcategory: 'Area Power Outage' (Department: 'Electricity', SLA: 1 day)
-   - Subcategory: 'Dangerous Sparks or Hanging Wire' (Department: 'Electricity', SLA: 1 day)
-3. Category: 'Roads & Streets'
-   - Subcategory: 'Potholes on Main Road' (Department: 'Roads & Infrastructure', SLA: 7 days)
-   - Subcategory: 'Broken Streetlights' (Department: 'Roads & Infrastructure', SLA: 5 days)
-4. Category: 'Garbage & Waste'
-   - Subcategory: 'Garbage Dump Overflow' (Department: 'Sanitation', SLA: 2 days)
-   - Subcategory: 'Drain Clogging' (Department: 'Sanitation', SLA: 3 days)
+Available Departments & Categories:
+1. Academic Affairs (Code: ACAD)
+   - Examination Issues (exams, hall tickets, grades, revaluation, results)
+   - Course & Curriculum (syllabus, electives, assignment schedule, lectures)
+   - Faculty & Teaching Quality (teaching standards, class conduct)
+2. Hostel & Accommodation (Code: HSTL)
+   - Room & Facilities (hostel room, water supply, electricity, bed, warden)
+   - Mess & Food (mess food quality, hygiene, mess timings)
+3. Library (Code: LIB)
+   - Book & Resource Access (book availability, journals, digital library, fines)
+4. IT & Technical Support (Code: IT)
+   - Network & Connectivity (campus WiFi, portal login, lab computer, email)
+5. Finance & Fees (Code: FIN)
+   - Fee Payment & Receipts (fee challan, tuition fee, scholarships, refunds)
+6. Student Welfare & Counseling (Code: WELF)
+   - Mental Health & Support (counseling, stress, wellness, medical emergency)
+7. Sports & Extracurricular (Code: SPRT)
+   - Facilities & Equipment (gym, grounds, sports equipment, cultural clubs)
+8. Transportation (Code: TRNS)
+   - Bus Service (college bus routes, timings, bus passes)
+9. Canteen & Food Services (Code: CANT)
+   - Food Quality & Hygiene (cafeteria hygiene, food prices, cleanliness)
+10. Placement & Career Services (Code: PLCMNT)
+   - Placement Process (internships, campus recruitment, interview drives)
+11. Ragging & Discipline (Code: DISC)
+   - Anti-Ragging (ragging, bullying, harassment, intimidation - ALWAYS CRITICAL priority)
 
 Rules for Priority:
-- LOW: Minor issue or simple request.
-- MEDIUM: Normal service disruption.
-- HIGH: Major impact or safety concern.
-- CRITICAL: Public emergency or immediate safety threat.
+- LOW: Informational or minor convenience issues (library books, sports club).
+- MEDIUM: Standard operational issues (wifi glitch, room fan issue, bus timing).
+- HIGH: Time-sensitive or academic blocks (exam hall ticket missing, fee deadline, results).
+- CRITICAL: Immediate safety, harassment, anti-ragging, medical emergencies.
 
-Analyze this grievance description: "${description}"
+Analyze this student grievance:
+"${description}"
 
 Return ONLY a valid JSON object matching this structure:
 {
-  "category": "category_name",
-  "subcategory": "subcategory_name",
-  "department": "department_name",
+  "category": "string",
+  "subcategory": "string",
+  "department": "string",
+  "departmentCode": "ACAD" | "HSTL" | "LIB" | "IT" | "FIN" | "WELF" | "SPRT" | "TRNS" | "CANT" | "PLCMNT" | "DISC",
   "priority": "LOW" | "MEDIUM" | "HIGH" | "CRITICAL",
-  "confidence": 0.0 to 1.0
+  "confidence": 0.0 to 1.0,
+  "explanation": "Brief reasoning for this classification"
 }`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
     let text = response.text();
-    
-    // Cleanup markdown formatting if model didn't follow JSON Mime type config strictly
     text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
     
     const parsed = JSON.parse(text);
     return {
-      category: parsed.category,
-      subcategory: parsed.subcategory,
-      department: parsed.department,
+      category: parsed.category || 'Academic Affairs',
+      subcategory: parsed.subcategory || 'General Academic',
+      department: parsed.department || 'Academic Affairs',
+      departmentCode: parsed.departmentCode || 'ACAD',
       priority: parsed.priority || 'MEDIUM',
-      confidence: parsed.confidence || 0.8
+      confidence: parsed.confidence || 0.85,
+      explanation: parsed.explanation || 'AI evaluated against college grievance rules.',
+      isAiRouted: true
     };
   } catch (error) {
     console.error('[Gemini SDK] Live Gemini Classification failed, falling back:', error);
@@ -83,7 +101,7 @@ Return ONLY a valid JSON object matching this structure:
 }
 
 /**
- * Handles conversational chat sessions using Gemini, falling back to local rule-based replies.
+ * Handles conversational chat sessions using Gemini for campus grievance queries.
  */
 async function chatWithGemini(userMessage, chatHistory = []) {
   if (!genAI) {
@@ -93,16 +111,21 @@ async function chatWithGemini(userMessage, chatHistory = []) {
   try {
     const model = genAI.getGenerativeModel({
       model: 'gemini-1.5-flash',
-      systemInstruction: 'You are the JanSuniye AI Civic Assistant. You help citizens write and summarize municipal grievances, identify responsible departments, explain municipal regulations, and track grievance statuses. Be polite, concise, and helpful. Do not speculate on confidential data.'
+      systemInstruction: `You are EduGrieve AI, an empathetic and authoritative Campus Grievance Assistant for college students.
+You assist students in:
+1. Identifying which college department handles their complaint (Academic, Hostel, IT, Finance, Library, Placement, Anti-Ragging, etc.).
+2. Explaining college SLA resolution timeframes (Critical: 24h, High: 48h, Medium: 72h, Low: 7 days).
+3. Advising how to structure complaints with evidence, photos, and tracking numbers.
+4. Explaining the confidential, anonymous submission feature.
+5. Providing urgent emergency contacts for anti-ragging and mental health counseling.
+Keep answers structured, concise, friendly, and formatted in clean Markdown.`
     });
 
-    // Map frontend chat history format to Gemini Chat history format
     const contents = chatHistory.map(item => ({
       role: item.role === 'user' ? 'user' : 'model',
       parts: [{ text: item.content }]
     }));
 
-    // Add current user message
     contents.push({
       role: 'user',
       parts: [{ text: userMessage }]
@@ -113,41 +136,45 @@ async function chatWithGemini(userMessage, chatHistory = []) {
     return response.text();
   } catch (error) {
     console.error('[Gemini SDK] Live Gemini Chat failed, falling back:', error);
-    return `[System Connection Error] I am having trouble connecting to my live LLM model right now. \n\nFallback Assistant Response: Let's check your concern manually. Are you trying to file a complaint about Roads, Water Supply, Electricity, or Sanitation? Describe the issue and I can help route it!`;
+    return getLocalChatResponse(userMessage);
   }
 }
 
-// Local conversational helper when GEMINI_API_KEY is not configured
+// Local college-oriented conversational helper when GEMINI_API_KEY is not configured
 function getLocalChatResponse(message) {
   const clean = message.toLowerCase();
   
-  const greeting = "Hi there! I am the JanSuniye AI Civic Assistant. \n\n*(Note: To connect me to a live Google Gemini LLM, configure the GEMINI_API_KEY environment variable in your backend).* \n\n";
+  const greeting = "🎓 **EduGrieve Campus AI Assistant**\n\n";
 
   if (clean.includes('hello') || clean.includes('hi') || clean.includes('hey')) {
-    return greeting + "How can I help you draft, route, or track your grievances today? Ask me about potholes, power cuts, water leakage, or trash overflow!";
+    return greeting + "Hello! I am your Campus Grievance Assistant. I can help you draft complaints, automatically route issues to the correct department (Academic Affairs, Hostel, IT, Finance, Welfare), and explain college SLAs.\n\nWhat can I assist you with today?";
   }
   
-  if (clean.includes('pothole') || clean.includes('road') || clean.includes('streetlight')) {
-    return greeting + "I can help with that! It sounds like a **Roads & Streets** grievance. \n\nTo file it, click 'File a Grievance' in the sidebar and choose 'Roads & Streets' as the category. The SLA is typically 5 to 7 days, routed to the Roads & Infrastructure department.";
+  if (clean.includes('exam') || clean.includes('result') || clean.includes('grade') || clean.includes('marks') || clean.includes('hall ticket')) {
+    return greeting + "📚 **Academic Affairs Issue Detected**\n\n- **Department:** Academic Affairs (ACAD)\n- **Typical SLA:** 48 hours for urgent exam issues, 72 hours for evaluations.\n- **Action:** Head to **Submit Grievance** → Select *Academic Affairs* or describe your concern. Our AI will automatically flag urgent hall ticket/result discrepancies for high-priority review.";
   }
 
-  if (clean.includes('leak') || clean.includes('water') || clean.includes('dirty')) {
-    return greeting + "That sounds like a **Water Supply** issue. \n\nIf the water is contaminated, choose 'Dirty Water Supply' (SLA: 2 Days). If it's a pipe break, choose 'Water Pipe Leakage' (SLA: 3 Days). Both are routed straight to the Water Supply department.";
+  if (clean.includes('hostel') || clean.includes('room') || clean.includes('warden') || clean.includes('mess')) {
+    return greeting + "🏢 **Hostel & Accommodation Concern**\n\n- **Department:** Hostel & Accommodation (HSTL)\n- **SLA:** 24 - 48 hours for maintenance and sanitation, 12 hours for urgent facility breakdowns.\n- **Tip:** You can upload photos of room maintenance or mess conditions during submission.";
   }
 
-  if (clean.includes('power') || clean.includes('electricity') || clean.includes('spark') || clean.includes('outage')) {
-    return greeting + "That sounds like an **Electricity & Power** issue. \n\nIf you see sparks or hanging wires, this is **Critical** and has a 24-hour resolution SLA. Please select 'Dangerous Sparks or Hanging Wire' on the submission form.";
+  if (clean.includes('wifi') || clean.includes('internet') || clean.includes('login') || clean.includes('portal') || clean.includes('lab')) {
+    return greeting + "💻 **IT & Technical Support**\n\n- **Department:** IT & Technical Support (IT)\n- **SLA:** 24 hours for network disruptions and system credentials.\n- **Tip:** Mention your lab location, room number, or student roll number for rapid resolution.";
   }
 
-  if (clean.includes('garbage') || clean.includes('trash') || clean.includes('drain') || clean.includes('sewage')) {
-    return greeting + "This is a **Garbage & Waste** grievance. \n\nIt will be routed to the Sanitation department. The resolution SLA is 2 days for garbage overflows and 3 days for drain clogging.";
+  if (clean.includes('fee') || clean.includes('receipt') || clean.includes('scholarship') || clean.includes('refund')) {
+    return greeting + "💳 **Finance & Fee Redressal**\n\n- **Department:** Finance & Accounts (FIN)\n- **SLA:** 48 hours for fee confirmation and scholarship status.\n- **Tip:** Attach your transaction reference or challan copy for faster audit.";
+  }
+
+  if (clean.includes('ragging') || clean.includes('bully') || clean.includes('threat') || clean.includes('harass')) {
+    return greeting + "🚨 **Anti-Ragging & Disciplinary Protocol (Immediate Action)**\n\n- **Priority:** CRITICAL (24-Hour Dean Escalation SLA)\n- **Anonymous Filing:** You may submit 100% anonymously with your identity protected.\n- **Direct Emergency:** Anti-Ragging Cell & Dean's Office are automatically notified upon submission.";
   }
 
   if (clean.includes('track') || clean.includes('status')) {
-    return greeting + "To track a grievance, enter the Grievance ID (e.g. `GRV-2026-000101`) in the tracking search bar or click 'Track Grievance' in the sidebar. You will see a live visual timeline of its resolution stage.";
+    return greeting + "🔍 **Tracking Your Grievance**\n\nEvery submission generates a unique tracking code (e.g., `EDU-2026-XXXX`). You can click **Track Grievance** in the sidebar anytime without logging in to see the real-time status, assigned officer, and history timeline.";
   }
 
-  return greeting + "I'm here to assist you! Describe your municipal issue (such as power outage, water leak, pothole, or garbage piling up), and I will explain how to file it, its expected SLA resolution timeline, and which department handles it.";
+  return greeting + "I can assist you with campus issues across **Academic Affairs**, **Hostel & Mess**, **Campus IT/WiFi**, **Finance & Scholarships**, **Transportation**, or **Student Welfare**. \n\nFeel free to describe what's going on and I'll guide you on how to file it!";
 }
 
 module.exports = {

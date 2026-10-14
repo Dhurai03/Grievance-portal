@@ -3,74 +3,48 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const grievanceController = require('../controllers/grievanceController');
+const gc = require('../controllers/grievanceController');
 const { authenticateJWT, authorizeRoles } = require('../middleware/authMiddleware');
 
-// Configure Multer Storage
+// Multer config
 const uploadDir = path.join(__dirname, '..', 'uploads');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
 const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, uploadDir);
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+  destination: (req, file, cb) => cb(null, uploadDir),
+  filename: (req, file, cb) => {
+    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    cb(null, `${uniqueSuffix}${path.extname(file.originalname)}`);
   }
 });
-
-// File type validation list
-const ALLOWED_TYPES = [
-  'image/jpeg', 'image/png', 'image/gif', 
-  'application/pdf', 
-  'application/msword', 
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'video/mp4', 'video/quicktime'
-];
 
 const upload = multer({
-  storage: storage,
-  limits: {
-    fileSize: 20 * 1024 * 1024 // 20 MB max
-  },
-  fileFilter: function (req, file, cb) {
-    if (ALLOWED_TYPES.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error('Invalid file type. Only JPEG, PNG, GIF, PDF, Word DOCs, and MP4/MOV videos are allowed.'));
-    }
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  fileFilter: (req, file, cb) => {
+    const allowed = /jpeg|jpg|png|gif|pdf|doc|docx|txt/;
+    const ext = allowed.test(path.extname(file.originalname).toLowerCase());
+    const mime = allowed.test(file.mimetype);
+    if (ext || mime) cb(null, true);
+    else cb(new Error('Invalid file type.'));
   }
 });
 
-// Routes
-router.get('/', authenticateJWT, grievanceController.list);
-router.post('/', authenticateJWT, authorizeRoles('citizen'), grievanceController.submit);
-router.get('/:id', authenticateJWT, grievanceController.getById);
+// Public
+router.get('/track/:trackingId', gc.trackGrievance);
 
-router.patch('/:id/status', authenticateJWT, grievanceController.updateStatus);
-router.post('/:id/comments', authenticateJWT, grievanceController.addComment);
-router.post('/:id/feedback', authenticateJWT, authorizeRoles('citizen'), grievanceController.submitFeedback);
+// Authenticated
+router.post('/', authenticateJWT, upload.array('attachments', 5), gc.submitGrievance);
+router.get('/', authenticateJWT, gc.getGrievances);
+router.get('/:id', authenticateJWT, gc.getGrievanceById);
+router.post('/:id/comments', authenticateJWT, gc.addComment);
+router.post('/:id/feedback', authenticateJWT, authorizeRoles('student'), gc.submitFeedback);
 
-router.post('/:id/assign', authenticateJWT, authorizeRoles('admin', 'officer'), grievanceController.assign);
-router.post('/:id/escalate', authenticateJWT, authorizeRoles('officer'), grievanceController.escalate);
+// Officer/Admin
+router.patch('/:id/status', authenticateJWT, authorizeRoles('officer', 'admin', 'dean', 'faculty'), gc.updateStatus);
+router.patch('/:id/assign', authenticateJWT, authorizeRoles('admin', 'dean'), gc.assignGrievance);
 
-// Evidence attachment upload route
-router.post('/:id/attachments', authenticateJWT, upload.array('evidence', 5), grievanceController.uploadAttachments);
-
-// Error handler for Multer upload issues
-router.use((err, req, res, next) => {
-  if (err instanceof multer.MulterError) {
-    if (err.code === 'LIMIT_FILE_SIZE') {
-      return res.status(400).json({ error: 'File too large. Maximum size allowed is 20MB.' });
-    }
-    return res.status(400).json({ error: `Upload error: ${err.message}` });
-  } else if (err) {
-    return res.status(400).json({ error: err.message });
-  }
-  next();
-});
+// AI classification preview
+router.post('/ai-classify', authenticateJWT, gc.aiClassify);
 
 module.exports = router;
