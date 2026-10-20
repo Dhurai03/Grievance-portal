@@ -97,6 +97,27 @@ const api = {
   updateUserRole: (id, data) => fetch(`${API_BASE}/analytics/users/${id}/role`, {
     method: 'PATCH', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() }, body: JSON.stringify(data)
   }).then(handleResponse),
+
+  // Advanced AI Features (Modules 1, 2, 3, 4, 5)
+  checkDuplicates: (data) => fetch(`${API_BASE}/ai/check-duplicates`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() }, body: JSON.stringify(data)
+  }).then(handleResponse),
+
+  detectUrgency: (text) => fetch(`${API_BASE}/ai/urgency`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() }, body: JSON.stringify({ text })
+  }).then(handleResponse),
+
+  draftWithAI: (notes, category) => fetch(`${API_BASE}/ai/draft`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() }, body: JSON.stringify({ notes, category })
+  }).then(handleResponse),
+
+  chatAI: (message, history) => fetch(`${API_BASE}/ai/chat`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() }, body: JSON.stringify({ message, history })
+  }).then(handleResponse),
+
+  auditSla: () => fetch(`${API_BASE}/grievances/audit-sla`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() }
+  }).then(handleResponse),
 };
 
 export default api;

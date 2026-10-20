@@ -25,13 +25,17 @@ function AppContent() {
     return (
       <div className="loading-screen">
         <div style={{
-          width: '52px', height: '52px', borderRadius: '16px',
-          background: 'linear-gradient(135deg, var(--primary), var(--accent))',
+          width: '48px', height: '48px', borderRadius: '12px',
+          background: 'var(--primary)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          animation: 'glowPulse 2s infinite', fontSize: '1.5rem'
-        }}>🎓</div>
+          boxShadow: '0 2px 8px rgba(37, 99, 235, 0.25)'
+        }}>
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/>
+          </svg>
+        </div>
         <div className="spinner" />
-        <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Loading EduGrieve Portal...</span>
+        <span style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-muted)' }}>Loading EduGrieve Portal...</span>
       </div>
     );
   }

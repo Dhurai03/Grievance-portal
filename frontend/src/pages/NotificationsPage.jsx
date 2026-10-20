@@ -7,13 +7,13 @@ import {
 } from 'lucide-react';
 
 const NOTIF_ICONS = {
-  GRIEVANCE_SUBMITTED: { icon: '📬', color: '#4FC3F7', bg: 'rgba(79,195,247,0.15)' },
-  STATUS_UPDATED: { icon: '🔄', color: '#6C63FF', bg: 'rgba(108,99,255,0.15)' },
-  GRIEVANCE_ASSIGNED: { icon: '📋', color: '#00D4AA', bg: 'rgba(0,212,170,0.15)' },
-  SLA_BREACH: { icon: '🚨', color: '#FF4444', bg: 'rgba(255,68,68,0.15)' },
-  ESCALATED: { icon: '⚠️', color: '#FFB347', bg: 'rgba(255,179,71,0.15)' },
-  NEW_COMMENT: { icon: '💬', color: '#4FC3F7', bg: 'rgba(79,195,247,0.15)' },
-  DEFAULT: { icon: '🔔', color: '#6C63FF', bg: 'rgba(108,99,255,0.15)' }
+  GRIEVANCE_SUBMITTED: { icon: '📬', color: '#2563EB', bg: '#EFF6FF' },
+  STATUS_UPDATED: { icon: '🔄', color: '#4F46E5', bg: '#EEF2FF' },
+  GRIEVANCE_ASSIGNED: { icon: '📋', color: '#059669', bg: '#ECFDF5' },
+  SLA_BREACH: { icon: '🚨', color: '#DC2626', bg: '#FEF2F2' },
+  ESCALATED: { icon: '⚠️', color: '#D97706', bg: '#FEF3C7' },
+  NEW_COMMENT: { icon: '💬', color: '#2563EB', bg: '#EFF6FF' },
+  DEFAULT: { icon: '🔔', color: '#2563EB', bg: '#EFF6FF' }
 };
 
 export default function NotificationsPage({ navigate }) {
@@ -76,19 +76,19 @@ export default function NotificationsPage({ navigate }) {
       {/* Header */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        flexWrap: 'wrap', gap: '16px', marginBottom: '24px'
+        flexWrap: 'wrap', gap: '14px', marginBottom: '20px'
       }}>
         <div>
-          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', fontWeight: 800, marginBottom: '4px' }}>
-            Notifications & Updates 🔔
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.25rem', fontWeight: 700, marginBottom: '3px', color: 'var(--text-primary)' }}>
+            Notifications & Updates
           </h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>
             {unreadCount > 0 ? `You have ${unreadCount} unread notification${unreadCount > 1 ? 's' : ''}.` : 'All caught up! No unread notifications.'}
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button className="btn btn-ghost btn-sm" onClick={loadNotifications}>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button className="btn btn-secondary btn-sm" onClick={loadNotifications}>
             <RefreshCw size={14} /> Refresh
           </button>
           {unreadCount > 0 && (
@@ -100,14 +100,15 @@ export default function NotificationsPage({ navigate }) {
       </div>
 
       {/* Filter Tabs */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+      <div style={{ display: 'flex', gap: '6px', marginBottom: '14px' }}>
         <button
           onClick={() => setUnreadOnly(false)}
           style={{
-            padding: '6px 14px', borderRadius: '10px', border: 'none',
-            background: !unreadOnly ? 'var(--primary)' : 'var(--bg-card)',
+            padding: '5px 12px', borderRadius: '6px',
+            border: !unreadOnly ? '1px solid var(--primary)' : '1px solid var(--border-color)',
+            background: !unreadOnly ? 'var(--primary)' : 'var(--bg-secondary)',
             color: !unreadOnly ? '#fff' : 'var(--text-secondary)',
-            fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer'
+            fontWeight: 600, fontSize: '0.8125rem', cursor: 'pointer'
           }}
         >
           All ({notifications.length})
@@ -115,10 +116,11 @@ export default function NotificationsPage({ navigate }) {
         <button
           onClick={() => setUnreadOnly(true)}
           style={{
-            padding: '6px 14px', borderRadius: '10px', border: 'none',
-            background: unreadOnly ? 'var(--primary)' : 'var(--bg-card)',
+            padding: '5px 12px', borderRadius: '6px',
+            border: unreadOnly ? '1px solid var(--primary)' : '1px solid var(--border-color)',
+            background: unreadOnly ? 'var(--primary)' : 'var(--bg-secondary)',
             color: unreadOnly ? '#fff' : 'var(--text-secondary)',
-            fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer'
+            fontWeight: 600, fontSize: '0.8125rem', cursor: 'pointer'
           }}
         >
           Unread ({unreadCount})
@@ -126,16 +128,16 @@ export default function NotificationsPage({ navigate }) {
       </div>
 
       {/* Notification List */}
-      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', overflow: 'hidden' }}>
+      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '10px', overflow: 'hidden', boxShadow: 'var(--shadow-sm)' }}>
         {loading ? (
-          <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {[1, 2, 3].map(i => <div key={i} className="skeleton" style={{ height: '70px' }} />)}
+          <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {[1, 2, 3].map(i => <div key={i} className="skeleton" style={{ height: '60px' }} />)}
           </div>
         ) : filtered.length === 0 ? (
-          <div className="empty-state" style={{ padding: '60px 20px' }}>
-            <Bell size={40} color="var(--text-muted)" />
-            <h3 style={{ marginTop: '12px' }}>No Notifications</h3>
-            <p>You'll receive real-time alerts whenever your grievances are updated or reviewed.</p>
+          <div className="empty-state" style={{ padding: '48px 20px' }}>
+            <Bell size={36} color="var(--text-muted)" />
+            <h3 style={{ marginTop: '10px' }}>No Notifications</h3>
+            <p>You will receive updates when your grievances are reviewed or resolved.</p>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -147,21 +149,21 @@ export default function NotificationsPage({ navigate }) {
                   key={n._id}
                   onClick={() => handleItemClick(n)}
                   style={{
-                    padding: '16px 20px',
+                    padding: '14px 18px',
                     borderBottom: idx < filtered.length - 1 ? '1px solid var(--border-color)' : 'none',
                     display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
-                    gap: '16px', cursor: 'pointer',
-                    background: n.isRead ? 'transparent' : 'rgba(108,99,255,0.04)',
-                    transition: 'background 0.15s ease'
+                    gap: '14px', cursor: 'pointer',
+                    background: n.isRead ? 'transparent' : '#F8FAFC',
+                    transition: 'var(--transition)'
                   }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
-                  onMouseLeave={e => e.currentTarget.style.background = n.isRead ? 'transparent' : 'rgba(108,99,255,0.04)'}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-secondary)'}
+                  onMouseLeave={e => e.currentTarget.style.background = n.isRead ? 'transparent' : '#F8FAFC'}
                 >
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', flex: 1 }}>
                     <div style={{
-                      width: '38px', height: '38px', borderRadius: '10px',
+                      width: '34px', height: '34px', borderRadius: '8px',
                       background: meta.bg, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: '1.2rem', flexShrink: 0, marginTop: '2px'
+                      fontSize: '1.1rem', flexShrink: 0, marginTop: '2px'
                     }}>
                       {meta.icon}
                     </div>

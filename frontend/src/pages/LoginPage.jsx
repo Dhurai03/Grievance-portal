@@ -35,38 +35,34 @@ export default function LoginPage({ navigate }) {
   return (
     <div style={{
       minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'var(--bg-primary)', padding: '24px', position: 'relative', overflow: 'hidden'
+      background: 'var(--bg-primary)', padding: '24px'
     }}>
-      {/* Background blobs */}
-      <div style={{ position: 'absolute', top: '-100px', right: '-100px', width: '500px', height: '500px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(108,99,255,0.12) 0%, transparent 70%)', filter: 'blur(40px)', pointerEvents: 'none' }} />
-      <div style={{ position: 'absolute', bottom: '-100px', left: '-100px', width: '400px', height: '400px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(0,212,170,0.08) 0%, transparent 70%)', filter: 'blur(40px)', pointerEvents: 'none' }} />
-
-      <div style={{ width: '100%', maxWidth: '420px', animation: 'scaleIn 0.4s ease' }}>
+      <div style={{ width: '100%', maxWidth: '400px', animation: 'fadeIn 0.3s ease' }}>
         {/* Back */}
-        <button className="btn btn-ghost btn-sm" style={{ marginBottom: '24px' }} onClick={() => navigate('#landing')}>
-          <ArrowLeft size={16} /> Back to Home
+        <button className="btn btn-ghost btn-sm" style={{ marginBottom: '20px' }} onClick={() => navigate('#landing')}>
+          <ArrowLeft size={15} /> Back
         </button>
 
         {/* Logo */}
-        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '28px' }}>
           <div style={{
-            width: '64px', height: '64px', borderRadius: '20px',
-            background: 'linear-gradient(135deg, var(--primary), var(--primary-light))',
+            width: '52px', height: '52px', borderRadius: '12px',
+            background: 'var(--primary)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            margin: '0 auto 16px', boxShadow: '0 8px 32px rgba(108,99,255,0.4)'
+            margin: '0 auto 14px', boxShadow: '0 2px 8px rgba(37,99,235,0.25)'
           }}>
-            <GraduationCap size={32} color="white" />
+            <GraduationCap size={26} color="white" />
           </div>
-          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '6px' }}>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>
             Welcome Back
           </h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Sign in to EduGrieve Portal</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Sign in to your EduGrieve account</p>
         </div>
 
         {/* Card */}
         <div style={{
-          background: 'var(--bg-card)', border: '1px solid var(--border-color)',
-          borderRadius: '24px', padding: '32px'
+          background: 'var(--bg-secondary)', border: '1px solid var(--border-color)',
+          borderRadius: '12px', padding: '28px', boxShadow: 'var(--shadow-sm)'
         }}>
           {error && (
             <div className="alert alert-error" style={{ marginBottom: '20px' }}>
@@ -117,27 +113,26 @@ export default function LoginPage({ navigate }) {
               </div>
             </div>
 
-            <button type="submit" className="btn btn-primary full-width" style={{ marginTop: '8px', height: '46px' }} disabled={loading}>
+            <button type="submit" className="btn btn-primary full-width" style={{ marginTop: '8px', height: '40px' }} disabled={loading}>
               {loading ? <div className="spinner-sm spinner" /> : 'Sign In'}
             </button>
           </form>
 
-          <div className="divider" style={{ margin: '20px 0' }} />
+          <div className="divider" style={{ margin: '18px 0' }} />
 
           {/* Quick Login Demo */}
           <div>
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>
-              <Zap size={12} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
-              Quick Demo Login
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center', marginBottom: '10px', fontWeight: 500 }}>
+              Demo accounts
             </p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
               {[
-                { label: '🎓 Student', email: 'student@college.edu', password: 'student123' },
-                { label: '🛡️ Admin', email: 'admin@college.edu', password: 'admin123' },
-                { label: '👮 Officer', email: 'academic.officer@college.edu', password: 'officer123' },
-                { label: '🎖️ Dean', email: 'dean@college.edu', password: 'dean123' },
+                { label: 'Student', email: 'student@college.edu', password: 'student123' },
+                { label: 'Admin', email: 'admin@college.edu', password: 'admin123' },
+                { label: 'Officer', email: 'academic.officer@college.edu', password: 'officer123' },
+                { label: 'Dean', email: 'dean@college.edu', password: 'dean123' },
               ].map(d => (
-                <button key={d.email} onClick={() => quickLogin(d.email, d.password)} className="btn btn-secondary btn-sm" style={{ fontSize: '0.75rem' }}>
+                <button key={d.email} onClick={() => quickLogin(d.email, d.password)} className="btn btn-secondary btn-sm" style={{ fontSize: '0.8125rem', justifyContent: 'flex-start' }}>
                   {d.label}
                 </button>
               ))}
@@ -145,9 +140,9 @@ export default function LoginPage({ navigate }) {
           </div>
         </div>
 
-        <p style={{ textAlign: 'center', marginTop: '20px', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
+        <p style={{ textAlign: 'center', marginTop: '16px', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
           Don't have an account?{' '}
-          <button onClick={() => navigate('#register')} style={{ background: 'none', border: 'none', color: 'var(--primary-light)', cursor: 'pointer', fontWeight: 600 }}>
+          <button onClick={() => navigate('#register')} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontWeight: 600 }}>
             Register here
           </button>
         </p>

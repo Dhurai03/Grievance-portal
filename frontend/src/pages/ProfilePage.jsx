@@ -66,58 +66,59 @@ export default function ProfilePage({ navigate }) {
     <div className="page-content" style={{ maxWidth: '800px', margin: '0 auto' }}>
       {/* Header Profile Badge */}
       <div style={{
-        background: 'linear-gradient(135deg, rgba(108,99,255,0.12), rgba(0,212,170,0.08))',
-        border: '1px solid var(--border-active)', borderRadius: '20px',
-        padding: '28px', marginBottom: '24px',
+        background: 'var(--bg-secondary)',
+        border: '1px solid var(--border-color)', borderRadius: '10px',
+        padding: '20px 24px', marginBottom: '20px',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        flexWrap: 'wrap', gap: '20px'
+        flexWrap: 'wrap', gap: '16px', boxShadow: 'var(--shadow-sm)'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <div style={{
-            width: '64px', height: '64px', borderRadius: '50%',
-            background: 'linear-gradient(135deg, var(--primary), var(--accent))',
+            width: '48px', height: '48px', borderRadius: '50%',
+            background: 'var(--primary)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '1.8rem', fontWeight: 800, color: 'white'
+            fontSize: '1.25rem', fontWeight: 700, color: 'white'
           }}>
             {user?.name?.[0]?.toUpperCase() || 'U'}
           </div>
 
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
-              <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 800 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
+              <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.25rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
                 {user?.name}
               </h1>
               <span className={`badge badge-${user?.role}`}>{user?.role?.toUpperCase()}</span>
             </div>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-              {user?.email} • {user?.studentId ? `Roll No: ${user.studentId}` : (user?.designation || 'Staff')}
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.8125rem', margin: 0 }}>
+              {user?.email} · {user?.studentId ? `Roll No: ${user.studentId}` : (user?.designation || 'Staff')}
             </p>
           </div>
         </div>
 
-        <button className="btn btn-ghost" onClick={logout} style={{ color: '#FF6B6B' }}>
-          <LogOut size={16} /> Sign Out
+        <button className="btn btn-secondary btn-sm" onClick={logout} style={{ color: '#DC2626' }}>
+          <LogOut size={14} /> Sign Out
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
         {/* Personal Details Card */}
-        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px' }}>
-          <h2 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <User size={18} color="var(--primary)" /> Profile Information
+        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '20px', boxShadow: 'var(--shadow-sm)' }}>
+          <h2 style={{ fontSize: '0.9375rem', fontWeight: 600, marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
+            <User size={16} color="var(--primary)" /> Profile Information
           </h2>
 
           {profileMsg.text && (
             <div style={{
-              padding: '10px 14px', borderRadius: '10px', marginBottom: '16px', fontSize: '0.85rem',
-              background: profileMsg.type === 'success' ? 'rgba(0,212,170,0.15)' : 'rgba(255,107,107,0.15)',
-              color: profileMsg.type === 'success' ? '#00D4AA' : '#FF6B6B'
+              padding: '8px 12px', borderRadius: '6px', marginBottom: '14px', fontSize: '0.8125rem',
+              background: profileMsg.type === 'success' ? '#ECFDF5' : '#FEF2F2',
+              border: `1px solid ${profileMsg.type === 'success' ? '#A7F3D0' : '#FECACA'}`,
+              color: profileMsg.type === 'success' ? '#065F46' : '#991B1B'
             }}>
               {profileMsg.text}
             </div>
           )}
 
-          <form onSubmit={handleUpdateProfile} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <form onSubmit={handleUpdateProfile} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div>
               <label className="form-label">Full Name</label>
               <input
@@ -150,29 +151,30 @@ export default function ProfilePage({ navigate }) {
               />
             </div>
 
-            <button type="submit" className="btn btn-primary" disabled={savingProfile} style={{ marginTop: '8px' }}>
-              <Save size={15} /> {savingProfile ? 'Saving...' : 'Update Profile'}
+            <button type="submit" className="btn btn-primary btn-sm" disabled={savingProfile} style={{ marginTop: '4px' }}>
+              <Save size={14} /> {savingProfile ? 'Saving...' : 'Update Profile'}
             </button>
           </form>
         </div>
 
         {/* Security & Password Card */}
-        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px' }}>
-          <h2 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Lock size={18} color="#FFB347" /> Security & Password
+        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '20px', boxShadow: 'var(--shadow-sm)' }}>
+          <h2 style={{ fontSize: '0.9375rem', fontWeight: 600, marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
+            <Lock size={16} color="var(--primary)" /> Security & Password
           </h2>
 
           {passwordMsg.text && (
             <div style={{
-              padding: '10px 14px', borderRadius: '10px', marginBottom: '16px', fontSize: '0.85rem',
-              background: passwordMsg.type === 'success' ? 'rgba(0,212,170,0.15)' : 'rgba(255,107,107,0.15)',
-              color: passwordMsg.type === 'success' ? '#00D4AA' : '#FF6B6B'
+              padding: '8px 12px', borderRadius: '6px', marginBottom: '14px', fontSize: '0.8125rem',
+              background: passwordMsg.type === 'success' ? '#ECFDF5' : '#FEF2F2',
+              border: `1px solid ${passwordMsg.type === 'success' ? '#A7F3D0' : '#FECACA'}`,
+              color: passwordMsg.type === 'success' ? '#065F46' : '#991B1B'
             }}>
               {passwordMsg.text}
             </div>
           )}
 
-          <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div>
               <label className="form-label">Current Password</label>
               <input
@@ -197,8 +199,8 @@ export default function ProfilePage({ navigate }) {
               />
             </div>
 
-            <button type="submit" className="btn btn-primary" disabled={savingPassword} style={{ marginTop: '8px' }}>
-              <Lock size={15} /> {savingPassword ? 'Updating...' : 'Change Password'}
+            <button type="submit" className="btn btn-primary btn-sm" disabled={savingPassword} style={{ marginTop: '4px' }}>
+              <Lock size={14} /> {savingPassword ? 'Updating...' : 'Change Password'}
             </button>
           </form>
         </div>

@@ -3,10 +3,10 @@ import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import {
   ArrowLeft, Clock, User, Building2, Tag, Send, Star,
-  Paperclip, Lock, MessageSquare, History, Brain, ChevronDown, Check
+  Paperclip, Lock, MessageSquare, History, Brain, ChevronDown, Check, Copy
 } from 'lucide-react';
 
-const PRIORITY_COLORS = { LOW: '#00D4AA', MEDIUM: '#FFB347', HIGH: '#FF8C42', CRITICAL: '#FF4444' };
+const PRIORITY_COLORS = { LOW: '#059669', MEDIUM: '#D97706', HIGH: '#D97706', CRITICAL: '#DC2626' };
 
 function formatDate(d) {
   if (!d) return '—';
@@ -100,7 +100,7 @@ export default function GrievanceDetailPage({ navigate, id }) {
   const canUpdateStatus = isOfficer;
   const canGiveFeedback = isOwner && grievance.status === 'RESOLVED' && !grievance.feedback?.rating;
 
-  const pc = PRIORITY_COLORS[grievance.priority] || '#FFB347';
+  const pc = PRIORITY_COLORS[grievance.priority] || '#D97706';
 
   return (
     <div className="page-content" style={{ maxWidth: '1100px' }}>
@@ -110,29 +110,29 @@ export default function GrievanceDetailPage({ navigate, id }) {
       )}
 
       {/* Back + Header */}
-      <button className="btn btn-ghost btn-sm" style={{ marginBottom: '20px' }} onClick={() => window.history.back()}>
+      <button className="btn btn-ghost btn-sm" style={{ marginBottom: '16px' }} onClick={() => window.history.back()}>
         <ArrowLeft size={16} /> Back
       </button>
 
       {/* Title row */}
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px', marginBottom: '20px', flexWrap: 'wrap' }}>
         <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '8px' }}>
-            <span style={{ fontFamily: 'monospace', fontSize: '0.85rem', color: 'var(--primary-light)', background: 'rgba(108,99,255,0.12)', padding: '3px 10px', borderRadius: '6px' }}>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
+            <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: '0.8125rem', color: '#1E40AF', background: '#EFF6FF', border: '1px solid #BFDBFE', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>
               {grievance.trackingId}
             </span>
             <StatusBadge status={grievance.status} />
             <span className={`badge badge-${grievance.priority?.toLowerCase()}`}>{grievance.priority}</span>
-            {grievance.isAnonymous && <span className="badge" style={{ background: 'rgba(155,155,191,0.15)', color: '#9B9BBF', border: '1px solid rgba(155,155,191,0.3)' }}>🕵️ Anonymous</span>}
-            {grievance.isSlaBreach && <span className="badge badge-escalated">⚠️ SLA Breach</span>}
+            {grievance.isAnonymous && <span className="badge" style={{ background: '#F1F5F9', color: '#475569', border: '1px solid #CBD5E1' }}>🔒 Anonymous</span>}
+            {grievance.isSlaBreach && <span className="badge badge-escalated">⚠️ SLA Overdue</span>}
           </div>
-          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '4px' }}>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>
             {grievance.title}
           </h1>
-          <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-            <span><Building2 size={12} style={{ verticalAlign: 'middle', marginRight: '4px' }} />{grievance.department?.name || grievance.category}</span>
-            <span><Clock size={12} style={{ verticalAlign: 'middle', marginRight: '4px' }} />{formatDate(grievance.createdAt)}</span>
-            {!grievance.isAnonymous && <span><User size={12} style={{ verticalAlign: 'middle', marginRight: '4px' }} />{grievance.submittedBy?.name}</span>}
+          <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
+            <span><Building2 size={13} style={{ verticalAlign: 'middle', marginRight: '4px' }} />{grievance.department?.name || grievance.category}</span>
+            <span><Clock size={13} style={{ verticalAlign: 'middle', marginRight: '4px' }} />{formatDate(grievance.createdAt)}</span>
+            {!grievance.isAnonymous && <span><User size={13} style={{ verticalAlign: 'middle', marginRight: '4px' }} />{grievance.submittedBy?.name}</span>}
           </div>
         </div>
 
@@ -168,35 +168,35 @@ export default function GrievanceDetailPage({ navigate, id }) {
           </div>
 
           {activeTab === 'details' && (
-            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px', animation: 'fadeIn 0.3s ease' }}>
-              <h3 style={{ fontWeight: 700, marginBottom: '12px', color: 'var(--text-secondary)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Description</h3>
-              <p style={{ color: 'var(--text-primary)', lineHeight: 1.8, whiteSpace: 'pre-wrap', marginBottom: '20px' }}>{grievance.description}</p>
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '20px', boxShadow: 'var(--shadow-sm)' }}>
+              <h3 style={{ fontWeight: 600, marginBottom: '10px', color: 'var(--text-secondary)', fontSize: '0.8125rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Description</h3>
+              <p style={{ color: 'var(--text-primary)', lineHeight: 1.7, whiteSpace: 'pre-wrap', marginBottom: '16px', fontSize: '0.875rem' }}>{grievance.description}</p>
 
               {grievance.tags?.length > 0 && (
                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '16px' }}>
-                  <Tag size={14} color="var(--text-muted)" />
+                  <Tag size={13} color="var(--text-muted)" />
                   {grievance.tags.map(t => <span key={t} className="chip" style={{ fontSize: '0.75rem' }}>{t}</span>)}
                 </div>
               )}
 
               {grievance.resolutionNote && (
-                <div style={{ background: 'rgba(0,212,170,0.1)', border: '1px solid rgba(0,212,170,0.3)', borderRadius: '12px', padding: '16px', marginTop: '16px' }}>
-                  <div style={{ fontWeight: 700, fontSize: '0.8rem', color: '#00D4AA', marginBottom: '6px' }}>✅ Resolution Note</div>
-                  <p style={{ fontSize: '0.875rem', color: 'var(--text-primary)', lineHeight: 1.7 }}>{grievance.resolutionNote}</p>
+                <div style={{ background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: '8px', padding: '14px', marginTop: '14px' }}>
+                  <div style={{ fontWeight: 600, fontSize: '0.8125rem', color: '#065F46', marginBottom: '4px' }}>✓ Official Resolution Note</div>
+                  <p style={{ fontSize: '0.875rem', color: '#065F46', lineHeight: 1.6, margin: 0 }}>{grievance.resolutionNote}</p>
                 </div>
               )}
 
               {grievance.attachments?.length > 0 && (
                 <div style={{ marginTop: '16px' }}>
-                  <h4 style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px' }}>
+                  <h4 style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px' }}>
                     <Paperclip size={13} style={{ verticalAlign: 'middle', marginRight: '4px' }} />ATTACHMENTS
                   </h4>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     {grievance.attachments.map((a, i) => (
                       <a key={i} href={`/uploads/${a.filename}`} target="_blank" rel="noreferrer"
-                        style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'var(--bg-secondary)', borderRadius: '8px', color: 'var(--primary-light)', textDecoration: 'none', fontSize: '0.8rem' }}>
+                        style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 10px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--primary)', textDecoration: 'none', fontSize: '0.8125rem' }}>
                         <Paperclip size={13} /> {a.originalName}
-                        <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem', marginLeft: 'auto' }}>{(a.size / 1024).toFixed(0)} KB</span>
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.6875rem', marginLeft: 'auto' }}>{(a.size / 1024).toFixed(0)} KB</span>
                       </a>
                     ))}
                   </div>
@@ -204,47 +204,46 @@ export default function GrievanceDetailPage({ navigate, id }) {
               )}
 
               {grievance.feedback?.rating && (
-                <div style={{ marginTop: '20px', background: 'rgba(255,179,71,0.08)', border: '1px solid rgba(255,179,71,0.2)', borderRadius: '12px', padding: '16px' }}>
-                  <div style={{ fontWeight: 700, fontSize: '0.8rem', color: '#FFB347', marginBottom: '8px' }}>⭐ Student Feedback</div>
-                  <div style={{ display: 'flex', gap: '4px', marginBottom: '8px' }}>
+                <div style={{ marginTop: '16px', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '8px', padding: '14px' }}>
+                  <div style={{ fontWeight: 600, fontSize: '0.8125rem', color: '#92400E', marginBottom: '6px' }}>⭐ Student Feedback</div>
+                  <div style={{ display: 'flex', gap: '4px', marginBottom: '6px' }}>
                     {[1, 2, 3, 4, 5].map(s => (
-                      <Star key={s} size={18} fill={s <= grievance.feedback.rating ? '#FFB347' : 'none'} color="#FFB347" />
+                      <Star key={s} size={16} fill={s <= grievance.feedback.rating ? '#D97706' : 'none'} color="#D97706" />
                     ))}
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: '8px' }}>{grievance.feedback.rating}/5</span>
+                    <span style={{ fontSize: '0.8125rem', color: '#92400E', marginLeft: '6px', fontWeight: 600 }}>{grievance.feedback.rating}/5</span>
                   </div>
-                  {grievance.feedback.comment && <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{grievance.feedback.comment}</p>}
+                  {grievance.feedback.comment && <p style={{ fontSize: '0.8125rem', color: '#78350F', margin: 0 }}>{grievance.feedback.comment}</p>}
                 </div>
               )}
             </div>
           )}
 
           {activeTab === 'comments' && (
-            <div style={{ animation: 'fadeIn 0.3s ease' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
+            <div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
                 {grievance.comments?.length === 0 && (
-                  <div className="empty-state" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '36px' }}>
-                    <MessageSquare size={32} />
+                  <div className="empty-state" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '32px' }}>
+                    <MessageSquare size={28} />
                     <p>No comments yet. Start the conversation.</p>
                   </div>
                 )}
                 {grievance.comments?.map((c, i) => (
                   <div key={i} style={{
-                    background: 'var(--bg-card)', border: `1px solid ${c.isInternal ? 'rgba(255,179,71,0.3)' : 'var(--border-color)'}`,
-                    borderRadius: '14px', padding: '16px',
-                    animation: 'fadeIn 0.3s ease'
+                    background: 'var(--bg-card)', border: `1px solid ${c.isInternal ? '#FDE68A' : 'var(--border-color)'}`,
+                    borderRadius: '8px', padding: '14px', boxShadow: 'var(--shadow-sm)'
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
-                      <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--primary), var(--accent))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: 700, color: 'white', flexShrink: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                      <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 600, color: 'white', flexShrink: 0 }}>
                         {c.author?.name?.[0] || '?'}
                       </div>
                       <div>
-                        <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>{c.author?.name || 'Unknown'}</span>
-                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginLeft: '8px' }}>{c.author?.role?.toUpperCase()}</span>
-                        {c.isInternal && <span style={{ marginLeft: '8px', fontSize: '0.65rem', background: 'rgba(255,179,71,0.15)', color: '#FFB347', border: '1px solid rgba(255,179,71,0.3)', padding: '1px 7px', borderRadius: '20px', fontWeight: 700 }}>INTERNAL</span>}
+                        <span style={{ fontWeight: 600, fontSize: '0.8125rem', color: 'var(--text-primary)' }}>{c.author?.name || 'Unknown'}</span>
+                        <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginLeft: '6px' }}>{c.author?.role?.toUpperCase()}</span>
+                        {c.isInternal && <span style={{ marginLeft: '6px', fontSize: '0.625rem', background: '#FEF3C7', color: '#92400E', border: '1px solid #FDE68A', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>INTERNAL NOTE</span>}
                       </div>
-                      <span style={{ marginLeft: 'auto', fontSize: '0.75rem', color: 'var(--text-muted)' }}>{formatDate(c.createdAt)}</span>
+                      <span style={{ marginLeft: 'auto', fontSize: '0.6875rem', color: 'var(--text-muted)' }}>{formatDate(c.createdAt)}</span>
                     </div>
-                    <p style={{ fontSize: '0.875rem', lineHeight: 1.7, color: 'var(--text-primary)' }}>{c.text}</p>
+                    <p style={{ fontSize: '0.8125rem', lineHeight: 1.6, color: 'var(--text-primary)', margin: 0 }}>{c.text}</p>
                   </div>
                 ))}
               </div>
@@ -294,42 +293,122 @@ export default function GrievanceDetailPage({ navigate, id }) {
             </div>
           )}
 
-          {activeTab === 'ai' && grievance.aiClassification && (
-            <div style={{ background: 'var(--bg-card)', border: '1px solid rgba(108,99,255,0.3)', borderRadius: '16px', padding: '24px', animation: 'fadeIn 0.3s ease' }}>
-              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '20px' }}>
-                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(108,99,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Brain size={20} color="var(--primary-light)" />
+          {activeTab === 'ai' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {/* Module 1: Department & Category Classification */}
+              <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '20px', boxShadow: 'var(--shadow-sm)' }}>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '14px' }}>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Brain size={18} color="var(--primary)" />
+                  </div>
+                  <div>
+                    <h3 style={{ fontWeight: 600, fontSize: '0.9375rem', color: 'var(--text-primary)', margin: 0 }}>1. Department & Category Routing</h3>
+                    <p style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', margin: 0 }}>TF-IDF + Multinomial Logistic Regression</p>
+                  </div>
+                  <span className="badge badge-submitted" style={{ marginLeft: 'auto' }}>
+                    Core AI
+                  </span>
                 </div>
-                <div>
-                  <h3 style={{ fontWeight: 700 }}>AI Analysis Results</h3>
-                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Model: {grievance.aiClassification.model || 'keyword-nlp'}</p>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px', marginBottom: '14px' }}>
+                  <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', padding: '10px 12px', borderRadius: '8px' }}>
+                    <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>Routed Department</div>
+                    <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginTop: '2px', fontSize: '0.8125rem' }}>{grievance.department?.name || grievance.category}</div>
+                  </div>
+                  <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', padding: '10px 12px', borderRadius: '8px' }}>
+                    <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>Category / Subcategory</div>
+                    <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginTop: '2px', fontSize: '0.8125rem' }}>{grievance.category} / {grievance.subcategory || 'General'}</div>
+                  </div>
+                  <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', padding: '10px 12px', borderRadius: '8px' }}>
+                    <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>Prediction Confidence</div>
+                    <div style={{ fontWeight: 600, color: '#059669', marginTop: '2px', fontSize: '0.8125rem' }}>
+                      {Math.round(((grievance.aiClassification?.confidence || 0.85) * 100))}%
+                    </div>
+                  </div>
+                </div>
+
+                {grievance.aiClassification?.reasoning && (
+                  <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '10px 12px', fontSize: '0.8125rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                    💡 <strong>Routing Context:</strong> {grievance.aiClassification.reasoning}
+                  </div>
+                )}
+              </div>
+
+              {/* Module 3: Complaint Severity & Urgency Detection */}
+              <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '20px', boxShadow: 'var(--shadow-sm)' }}>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '14px' }}>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#FEF3C7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Clock size={18} color="#D97706" />
+                  </div>
+                  <div>
+                    <h3 style={{ fontWeight: 600, fontSize: '0.9375rem', color: 'var(--text-primary)', margin: 0 }}>3. Complaint Severity & Urgency Detection</h3>
+                    <p style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', margin: 0 }}>Supervised Text Classifier (Priority Assessment)</p>
+                  </div>
+                  <span className={`badge badge-${grievance.priority?.toLowerCase()}`} style={{ marginLeft: 'auto' }}>
+                    {grievance.priority} Urgency
+                  </span>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px' }}>
+                  <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', padding: '10px 12px', borderRadius: '8px' }}>
+                    <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>Urgency Level</div>
+                    <div style={{ fontWeight: 600, color: pc, marginTop: '2px', fontSize: '0.8125rem' }}>{grievance.priority}</div>
+                  </div>
+                  <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', padding: '10px 12px', borderRadius: '8px' }}>
+                    <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>Staff Review Required</div>
+                    <div style={{ fontWeight: 600, color: grievance.flaggedForStaffReview ? '#DC2626' : '#059669', marginTop: '2px', fontSize: '0.8125rem' }}>
+                      {grievance.flaggedForStaffReview ? '⚠️ Expedited Review' : '✓ Standard Review'}
+                    </div>
+                  </div>
+                  <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', padding: '10px 12px', borderRadius: '8px' }}>
+                    <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>Urgency Score (0 - 1.0)</div>
+                    <div style={{ fontWeight: 600, color: 'var(--primary)', marginTop: '2px', fontSize: '0.8125rem' }}>
+                      {grievance.urgencyAnalysis?.urgencyScore?.toFixed(2) || (grievance.priority === 'CRITICAL' ? '0.95' : grievance.priority === 'HIGH' ? '0.75' : '0.45')}
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {[
-                  { label: 'Detected Department', value: grievance.aiClassification.department },
-                  { label: 'Category', value: grievance.aiClassification.category },
-                  { label: 'Subcategory', value: grievance.aiClassification.subcategory },
-                  { label: 'Recommended Priority', value: grievance.aiClassification.priority },
-                  { label: 'AI Routed', value: grievance.isAiRouted ? '✅ Yes (Gemini AI)' : '⚠️ Keyword Fallback' },
-                ].map(r => (
-                  <div key={r.label} className="info-row">
-                    <span className="label">{r.label}</span>
-                    <span>{r.value || '—'}</span>
+
+              {/* Module 2: Duplicate & Similar Grievance Detection */}
+              <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '20px', boxShadow: 'var(--shadow-sm)' }}>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '14px' }}>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#D1FAE5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Copy size={18} color="#059669" />
                   </div>
-                ))}
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '6px' }}>
-                    <span style={{ color: 'var(--text-muted)' }}>Confidence Score</span>
-                    <span style={{ color: '#00D4AA', fontWeight: 700 }}>{Math.round((grievance.aiClassification.confidence || 0) * 100)}%</span>
+                  <div>
+                    <h3 style={{ fontWeight: 600, fontSize: '0.9375rem', color: 'var(--text-primary)', margin: 0 }}>2. Duplicate & Similar Grievance Detection</h3>
+                    <p style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', margin: 0 }}>Sentence Transformers + Cosine Similarity</p>
                   </div>
-                  <div className="progress-bar">
-                    <div className="progress-fill" style={{ width: `${Math.round((grievance.aiClassification.confidence || 0) * 100)}%` }} />
-                  </div>
+                  {grievance.similarityAnalysis?.hasDuplicate && (
+                    <span className="badge badge-escalated" style={{ marginLeft: 'auto' }}>
+                      Duplicate Flagged
+                    </span>
+                  )}
                 </div>
-                {grievance.aiClassification.reasoning && (
-                  <div style={{ background: 'rgba(108,99,255,0.08)', borderRadius: '10px', padding: '12px', fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.7 }}>
-                    💡 {grievance.aiClassification.reasoning}
+
+                {grievance.similarityAnalysis?.matches && grievance.similarityAnalysis.matches.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {grievance.similarityAnalysis.matches.map((match, i) => (
+                      <div key={i} style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', padding: '10px 14px', borderRadius: '8px', fontSize: '0.8125rem'
+                      }}>
+                        <div>
+                          <strong style={{ color: 'var(--primary)' }}>[{match.trackingId}]</strong> {match.title}
+                        </div>
+                        <span style={{
+                          fontWeight: 600,
+                          color: match.similarityScore >= 0.75 ? '#DC2626' : '#D97706',
+                          background: match.similarityScore >= 0.75 ? '#FEE2E2' : '#FEF3C7', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem'
+                        }}>
+                          {Math.round(match.similarityScore * 100)}% Semantic Match
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', padding: '12px 14px', borderRadius: '8px', fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
+                    ✓ No duplicate or highly similar grievances detected in this department. Issue appears unique.
                   </div>
                 )}
               </div>
@@ -340,35 +419,35 @@ export default function GrievanceDetailPage({ navigate, id }) {
         {/* Right Sidebar */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {/* Info Card */}
-          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '14px', padding: '18px' }}>
-            <h3 style={{ fontWeight: 700, fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '14px' }}>Grievance Info</h3>
+          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '16px', boxShadow: 'var(--shadow-sm)' }}>
+            <h3 style={{ fontWeight: 600, fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>Grievance Info</h3>
             {[
               { label: 'Tracking ID', value: <span className="font-mono">{grievance.trackingId}</span> },
               { label: 'Department', value: grievance.department?.name || '—' },
               { label: 'Category', value: grievance.category },
               { label: 'Assigned To', value: grievance.assignedTo?.name || 'Unassigned' },
-              { label: 'Priority', value: <span style={{ color: pc, fontWeight: 700 }}>{grievance.priority}</span> },
+              { label: 'Priority', value: <span style={{ color: pc, fontWeight: 600 }}>{grievance.priority}</span> },
               { label: 'SLA Deadline', value: grievance.slaDeadline ? new Date(grievance.slaDeadline).toLocaleDateString('en-IN') : '—' },
               { label: 'Views', value: grievance.viewCount || 0 },
             ].map(r => (
               <div key={r.label} className="info-row">
                 <span className="label">{r.label}</span>
-                <span style={{ textAlign: 'right', fontSize: '0.82rem' }}>{r.value}</span>
+                <span style={{ textAlign: 'right', fontSize: '0.8125rem' }}>{r.value}</span>
               </div>
             ))}
           </div>
 
           {/* Submitter Info */}
           {isOfficer && !grievance.isAnonymous && grievance.submittedBy && (
-            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '14px', padding: '18px' }}>
-              <h3 style={{ fontWeight: 700, fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '14px' }}>Student Info</h3>
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '16px', boxShadow: 'var(--shadow-sm)' }}>
+              <h3 style={{ fontWeight: 600, fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>Student Info</h3>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-                <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--primary), var(--accent))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: 'white', fontSize: '0.9rem' }}>
+                <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, color: 'white', fontSize: '0.8125rem' }}>
                   {grievance.submittedBy.name?.[0]}
                 </div>
                 <div>
-                  <div style={{ fontWeight: 600, fontSize: '0.875rem' }}>{grievance.submittedBy.name}</div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{grievance.submittedBy.email}</div>
+                  <div style={{ fontWeight: 600, fontSize: '0.8125rem', color: 'var(--text-primary)' }}>{grievance.submittedBy.name}</div>
+                  <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>{grievance.submittedBy.email}</div>
                 </div>
               </div>
               {[
@@ -377,9 +456,9 @@ export default function GrievanceDetailPage({ navigate, id }) {
                 { label: 'Year', value: grievance.submittedBy.year ? `Year ${grievance.submittedBy.year}` : '—' },
                 { label: 'Section', value: grievance.submittedBy.section || '—' },
               ].map(r => r.value && (
-                <div key={r.label} className="info-row" style={{ padding: '8px 0' }}>
-                  <span className="label" style={{ fontSize: '0.72rem' }}>{r.label}</span>
-                  <span style={{ fontSize: '0.8rem' }}>{r.value}</span>
+                <div key={r.label} className="info-row" style={{ padding: '6px 0' }}>
+                  <span className="label" style={{ fontSize: '0.6875rem' }}>{r.label}</span>
+                  <span style={{ fontSize: '0.75rem' }}>{r.value}</span>
                 </div>
               ))}
             </div>

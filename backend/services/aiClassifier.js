@@ -1,11 +1,16 @@
 /**
- * AI Grievance Classifier for College Grievance Portal
- * Uses Google Gemini API when key is available, falls back to keyword-based NLP.
+ * AI Grievance Classification & Analytics Engine for EduGrieve
+ *
+ * Implements:
+ * 1. Core AI: NLP-based Department & Category Classification (TF-IDF + Logistic Regression)
+ * 2. Recommended AI: Duplicate & Similar Grievance Detection (Sentence Transformers + Cosine Similarity)
+ * 3. Recommended AI: Complaint Severity & Urgency Detection (Separate Supervised Text Classifier)
+ * Plus smart heuristic fallbacks if microservice is offline.
  */
 
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://127.0.0.1:5001';
 
-// College department routing rules (keyword-based NLP fallback)
+// College department routing rules (Keyword-based heuristic fallback)
 const COLLEGE_RULES = [
   {
     category: 'Academic Affairs',
@@ -123,20 +128,11 @@ const COLLEGE_RULES = [
     priority: 'CRITICAL',
     keywords: ['ragging', 'rag', 'seniors', 'bully', 'bully by senior', 'abuse', 'threat', 'intimidation', 'force', 'humiliation', 'misbehavior', 'misconduct'],
     boostKeywords: { 'physical': 'CRITICAL', 'sexual': 'CRITICAL', 'mental torture': 'CRITICAL' }
-  },
-  {
-    category: 'Faculty & Teaching Quality',
-    subcategory: 'Teaching Standards',
-    department: 'Academic Affairs',
-    departmentCode: 'ACAD',
-    priority: 'MEDIUM',
-    keywords: ['faculty', 'professor', 'teacher', 'teaching', 'class', 'lecture quality', 'not teaching', 'absent faculty', 'partial', 'bias', 'favoritism'],
-    boostKeywords: { 'harassment by faculty': 'CRITICAL', 'sexual harassment': 'CRITICAL' }
   }
 ];
 
 /**
- * Keyword-based NLP classification (fallback)
+ * Fallback: Keyword-based NLP classification
  */
 function classifyByKeywords(text) {
   if (!text || typeof text !== 'string') {
@@ -147,7 +143,8 @@ function classifyByKeywords(text) {
       departmentCode: 'ACAD',
       priority: 'MEDIUM',
       confidence: 0.1,
-      reasoning: 'No text provided; defaulted to Academic Affairs.'
+      reasoning: 'No text provided; defaulted to Academic Affairs.',
+      technique: 'Keyword NLP Fallback'
     };
   }
 
@@ -173,8 +170,9 @@ function classifyByKeywords(text) {
       department: 'Academic Affairs',
       departmentCode: 'ACAD',
       priority: 'MEDIUM',
-      confidence: 0.2,
-      reasoning: 'No specific keywords matched. Defaulted to Academic Affairs.'
+      confidence: 0.25,
+      reasoning: 'No specific keywords matched. Defaulted to Academic Affairs.',
+      technique: 'Keyword NLP Fallback'
     };
   }
 
@@ -188,7 +186,7 @@ function classifyByKeywords(text) {
     }
   }
 
-  const confidence = Math.min(0.85, 0.3 + highestScore * 0.12);
+  const confidence = Math.min(0.85, 0.35 + highestScore * 0.10);
 
   return {
     category: bestMatch.category,
@@ -196,97 +194,220 @@ function classifyByKeywords(text) {
     department: bestMatch.department,
     departmentCode: bestMatch.departmentCode,
     priority,
-    confidence,
-    reasoning: `Matched ${highestScore / 2} keyword(s) in the "${bestMatch.category}" category.`,
-    model: 'keyword-nlp'
+    confidence: Number(confidence.toFixed(2)),
+    reasoning: `Matched ${Math.round(highestScore / 2)} keyword(s) in "${bestMatch.category}".`,
+    technique: 'Keyword NLP Heuristics'
   };
 }
 
 /**
- * Gemini AI classification
+ * Fallback: Urgency estimation
  */
-async function classifyWithGemini(text) {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    console.warn('[AI] No Gemini API key found. Using keyword-based fallback.');
-    return null;
+function estimateUrgencyFallback(text) {
+  const clean = (text || '').toLowerCase();
+  if (clean.includes('ragging') || clean.includes('suicide') || clean.includes('poison') || clean.includes('fire') || clean.includes('assault') || clean.includes('emergency')) {
+    return {
+      urgency: 'CRITICAL',
+      confidence: 0.85,
+      urgencyScore: 0.95,
+      flagForImmediateReview: true,
+      recommendedSlaHours: 24,
+      technique: 'Rule-based Urgency Fallback'
+    };
   }
-
-  try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-
-    const departmentList = [
-      'Academic Affairs (Code: ACAD)',
-      'Hostel & Accommodation (Code: HSTL)',
-      'Library (Code: LIB)',
-      'IT & Technical Support (Code: IT)',
-      'Finance & Fees (Code: FIN)',
-      'Student Welfare & Counseling (Code: WELF)',
-      'Sports & Extracurricular (Code: SPRT)',
-      'Transportation (Code: TRNS)',
-      'Canteen & Food Services (Code: CANT)',
-      'Placement & Career Services (Code: PLCMNT)',
-      'Ragging & Discipline (Code: DISC)',
-    ];
-
-    const prompt = `
-You are an AI assistant for a college grievance management portal. Analyze the following student grievance and classify it.
-
-Grievance Text: "${text}"
-
-Available Departments:
-${departmentList.join('\n')}
-
-Respond ONLY with a valid JSON object (no markdown, no explanation) in this exact format:
-{
-  "category": "<main category>",
-  "subcategory": "<specific subcategory>",
-  "department": "<department name from the list above>",
-  "departmentCode": "<code from the list above>",
-  "priority": "<LOW | MEDIUM | HIGH | CRITICAL>",
-  "confidence": <0.0 to 1.0>,
-  "reasoning": "<one sentence explaining the classification>"
-}
-
-Priority guide:
-- CRITICAL: Immediate safety/health risk, ragging, harassment, financial emergency
-- HIGH: Exam/result issues, fee deadlines, impactful academic concerns
-- MEDIUM: General requests, service issues, routine complaints
-- LOW: Minor inconveniences, suggestions, improvement requests
-`;
-
-    const result = await model.generateContent(prompt);
-    const responseText = result.response.text().trim();
-
-    // Parse JSON - handle markdown code blocks if present
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error('No valid JSON in Gemini response');
-
-    const parsed = JSON.parse(jsonMatch[0]);
-    parsed.model = 'gemini-1.5-flash';
-    parsed.classifiedAt = new Date();
-    return parsed;
-
-  } catch (error) {
-    console.error('[AI] Gemini classification error:', error.message);
-    return null;
+  if (clean.includes('deadline') || clean.includes('hall ticket') || clean.includes('revaluation') || clean.includes('no water') || clean.includes('harass') || clean.includes('today')) {
+    return {
+      urgency: 'HIGH',
+      confidence: 0.75,
+      urgencyScore: 0.78,
+      flagForImmediateReview: true,
+      recommendedSlaHours: 48,
+      technique: 'Rule-based Urgency Fallback'
+    };
   }
+  if (clean.includes('suggest') || clean.includes('magazine') || clean.includes('cricket') || clean.includes('bean bag') || clean.includes('plant') || clean.includes('font')) {
+    return {
+      urgency: 'LOW',
+      confidence: 0.65,
+      urgencyScore: 0.20,
+      flagForImmediateReview: false,
+      recommendedSlaHours: 120,
+      technique: 'Rule-based Urgency Fallback'
+    };
+  }
+  return {
+    urgency: 'MEDIUM',
+    confidence: 0.60,
+    urgencyScore: 0.50,
+    flagForImmediateReview: false,
+    recommendedSlaHours: 72,
+    technique: 'Rule-based Urgency Fallback'
+  };
 }
 
 /**
- * Main classify function - tries Gemini first, falls back to keywords
+ * 1. Core AI: NLP-Based Department & Category Classification
+ * Uses TF-IDF + Logistic Regression via AI Microservice
  */
-async function classifyGrievance(text) {
-  // Try Gemini AI first
-  const geminiResult = await classifyWithGemini(text);
-  if (geminiResult) {
-    return { ...geminiResult, isAiRouted: true };
+async function classifyWithTFIDF(text) {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3500);
+
+    const res = await fetch(`${AI_SERVICE_URL}/api/ai/classify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
+    if (res.ok) {
+      const data = await res.json();
+      return {
+        ...data,
+        isAiRouted: true
+      };
+    }
+  } catch (err) {
+    console.warn('[AI Engine] TF-IDF classification microservice call failed, using heuristic fallback:', err.message);
   }
 
-  // Keyword fallback
-  const keywordResult = classifyByKeywords(text);
-  return { ...keywordResult, isAiRouted: false };
+  const fallback = classifyByKeywords(text);
+  return {
+    ...fallback,
+    isAiRouted: false
+  };
 }
 
-module.exports = { classifyGrievance, classifyByKeywords };
+/**
+ * 2. Recommended AI: Complaint Severity and Urgency Detection
+ * Uses separate supervised text classifier via AI Microservice
+ */
+async function detectSeverityAndUrgency(text) {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3500);
+
+    const res = await fetch(`${AI_SERVICE_URL}/api/ai/urgency`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (err) {
+    console.warn('[AI Engine] Urgency classifier microservice call failed, using fallback:', err.message);
+  }
+
+  return estimateUrgencyFallback(text);
+}
+
+/**
+ * 3. Recommended AI: Duplicate and Similar Grievance Detection
+ * Uses Sentence Transformers + Cosine Similarity via AI Microservice
+ */
+async function findSimilarGrievances(queryText, candidateGrievances, threshold = 0.40) {
+  if (!candidateGrievances || candidateGrievances.length === 0) {
+    return { matches: [], totalMatches: 0, hasDuplicate: false, topMatch: null };
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+    const formattedCandidates = candidateGrievances.map(g => ({
+      id: String(g._id || g.id || ''),
+      trackingId: g.trackingId || '',
+      title: g.title || '',
+      description: g.description || '',
+      department: g.department?.name || (typeof g.department === 'string' ? g.department : 'General'),
+      status: g.status || 'SUBMITTED'
+    }));
+
+    const res = await fetch(`${AI_SERVICE_URL}/api/ai/similar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query: queryText,
+        grievances: formattedCandidates,
+        threshold
+      }),
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (err) {
+    console.warn('[AI Engine] Sentence Transformers similarity call failed:', err.message);
+  }
+
+  // Token-overlap fallback
+  const queryTokens = new Set(queryText.toLowerCase().split(/\W+/).filter(w => w.length > 3));
+  const fallbackMatches = [];
+
+  for (const cand of candidateGrievances) {
+    const candTokens = new Set(`${cand.title} ${cand.description}`.toLowerCase().split(/\W+/).filter(w => w.length > 3));
+    const intersection = [...queryTokens].filter(t => candTokens.has(t));
+    const union = new Set([...queryTokens, ...candTokens]);
+    const sim = union.size > 0 ? intersection.length / union.size : 0;
+
+    if (sim >= 0.25) {
+      fallbackMatches.push({
+        id: String(cand._id || cand.id),
+        trackingId: cand.trackingId,
+        title: cand.title,
+        similarityScore: Number(sim.toFixed(2)),
+        isDuplicate: sim >= 0.60,
+        isSimilar: sim >= 0.25,
+        method: 'Token Jaccard Overlap Fallback'
+      });
+    }
+  }
+
+  fallbackMatches.sort((a, b) => b.similarityScore - a.similarityScore);
+  return {
+    matches: fallbackMatches,
+    totalMatches: fallbackMatches.length,
+    hasDuplicate: fallbackMatches.some(m => m.isDuplicate),
+    topMatch: fallbackMatches[0] || null,
+    technique: 'Token Jaccard Overlap Fallback'
+  };
+}
+
+/**
+ * Master classification function: Predicts department, category & urgency
+ */
+async function classifyGrievance(text) {
+  const [deptResult, urgencyResult] = await Promise.all([
+    classifyWithTFIDF(text),
+    detectSeverityAndUrgency(text)
+  ]);
+
+  return {
+    category: deptResult.category,
+    subcategory: deptResult.subcategory,
+    department: deptResult.department,
+    departmentCode: deptResult.departmentCode,
+    priority: urgencyResult.urgency || deptResult.priority || 'MEDIUM',
+    confidence: deptResult.confidence,
+    reasoning: `Predicted via ${deptResult.technique || 'TF-IDF'}. Urgency evaluated as ${urgencyResult.urgency} via ${urgencyResult.technique || 'Urgency Classifier'}.`,
+    urgencyAnalysis: urgencyResult,
+    isAiRouted: deptResult.isAiRouted,
+    technique: deptResult.technique
+  };
+}
+
+module.exports = {
+  classifyGrievance,
+  classifyWithTFIDF,
+  detectSeverityAndUrgency,
+  findSimilarGrievances,
+  classifyByKeywords
+};

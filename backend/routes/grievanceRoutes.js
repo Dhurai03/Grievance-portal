@@ -44,6 +44,9 @@ router.post('/:id/feedback', authenticateJWT, authorizeRoles('student'), gc.subm
 router.patch('/:id/status', authenticateJWT, authorizeRoles('officer', 'admin', 'dean', 'faculty'), gc.updateStatus);
 router.patch('/:id/assign', authenticateJWT, authorizeRoles('admin', 'dean'), gc.assignGrievance);
 
+// SLA Monitoring & Escalation Audit
+router.post('/audit-sla', authenticateJWT, authorizeRoles('admin', 'dean', 'officer'), gc.auditSlaBreaches);
+
 // AI classification preview
 router.post('/ai-classify', authenticateJWT, gc.aiClassify);
 

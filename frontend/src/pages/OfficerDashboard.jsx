@@ -8,20 +8,20 @@ import {
 } from 'lucide-react';
 
 const STATUS_COLORS = {
-  SUBMITTED: { bg: 'rgba(79,195,247,0.15)', color: '#4FC3F7', icon: '📬', label: 'Submitted' },
-  UNDER_REVIEW: { bg: 'rgba(255,179,71,0.15)', color: '#FFB347', icon: '🔍', label: 'Under Review' },
-  IN_PROGRESS: { bg: 'rgba(108,99,255,0.15)', color: '#6C63FF', icon: '⚙️', label: 'In Progress' },
-  RESOLVED: { bg: 'rgba(0,212,170,0.15)', color: '#00D4AA', icon: '✅', label: 'Resolved' },
-  CLOSED: { bg: 'rgba(155,155,191,0.15)', color: '#9B9BBF', icon: '🔒', label: 'Closed' },
-  REJECTED: { bg: 'rgba(255,107,107,0.15)', color: '#FF6B6B', icon: '❌', label: 'Rejected' },
-  ESCALATED: { bg: 'rgba(255,68,68,0.15)', color: '#FF4444', icon: '🚨', label: 'Escalated' },
+  SUBMITTED: { bg: '#DBEAFE', color: '#0369A1', icon: '📬', label: 'Submitted' },
+  UNDER_REVIEW: { bg: '#FEF3C7', color: '#92400E', icon: '🔍', label: 'Under Review' },
+  IN_PROGRESS: { bg: '#EDE9FE', color: '#3730A3', icon: '⚙️', label: 'In Progress' },
+  RESOLVED: { bg: '#D1FAE5', color: '#065F46', icon: '✅', label: 'Resolved' },
+  CLOSED: { bg: '#F1F5F9', color: '#374151', icon: '🔒', label: 'Closed' },
+  REJECTED: { bg: '#FEE2E2', color: '#991B1B', icon: '❌', label: 'Rejected' },
+  ESCALATED: { bg: '#FEE2E2', color: '#7F1D1D', icon: '🚨', label: 'Escalated' },
 };
 
 const PRIORITY_COLORS = {
-  LOW: '#00D4AA',
-  MEDIUM: '#FFB347',
-  HIGH: '#FF8C42',
-  CRITICAL: '#FF4444'
+  LOW: '#059669',
+  MEDIUM: '#D97706',
+  HIGH: '#EA580C',
+  CRITICAL: '#DC2626'
 };
 
 function formatDate(d) {
@@ -97,52 +97,39 @@ export default function OfficerDashboard({ navigate }) {
 
   return (
     <div className="page-content">
-      {/* Officer Welcome Header */}
-      <div style={{
-        background: 'linear-gradient(135deg, rgba(0,212,170,0.12), rgba(108,99,255,0.08))',
-        border: '1px solid var(--border-active)', borderRadius: '20px',
-        padding: '24px 28px', marginBottom: '24px',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        flexWrap: 'wrap', gap: '16px'
-      }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-            <span style={{
-              background: 'rgba(0,212,170,0.15)', color: '#00D4AA',
-              padding: '3px 10px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 700
-            }}>OFFICER CONSOLE</span>
-            {user?.designation && (
-              <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>• {user.designation}</span>
-            )}
+      {/* Welcome Banner */}
+      <div className="welcome-banner">
+        <div className="welcome-banner-text">
+          <div className="welcome-banner-tag">
+            {user?.role === 'faculty' ? '👨‍🏫 Faculty Console' : '⚖️ Officer Console'}
           </div>
-          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', fontWeight: 800, marginBottom: '4px' }}>
-            Welcome, {user?.name}! 🛡️
-          </h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-            Manage and resolve departmental student grievances within assigned SLA windows.
+          <h1>Welcome back, {user?.name?.split(' ')[0]}!</h1>
+          <p>
+            {user?.designation ? `${user.designation} · ` : ''}
+            Manage and resolve student grievances within SLA windows.
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button className="btn btn-ghost" onClick={loadData}>
-            <RefreshCw size={15} /> Refresh
+        <div className="welcome-banner-actions">
+          <button className="btn btn-secondary btn-sm" onClick={loadData}>
+            <RefreshCw size={14} /> Refresh
           </button>
-          <button className="btn btn-primary" onClick={() => navigate('#officer/grievances')}>
-            <FileText size={16} /> All Tickets
+          <button className="btn btn-primary btn-sm" onClick={() => navigate('#officer/grievances')}>
+            <FileText size={14} /> All Tickets
           </button>
         </div>
       </div>
 
       {/* Metric Cards */}
-      <div className="stats-grid" style={{ marginBottom: '24px' }}>
+      <div className="stats-grid" style={{ marginBottom: '20px' }}>
         {[
-          { label: 'Assigned Complaints', value: stats.total, icon: FileText, color: '#6C63FF', gradient: 'linear-gradient(90deg, #6C63FF, #8B85FF)' },
-          { label: 'Pending Redressal', value: stats.pending, icon: Clock, color: '#FFB347', gradient: 'linear-gradient(90deg, #FFB347, #FF8C42)' },
-          { label: 'Successfully Resolved', value: stats.resolved, icon: CheckCircle, color: '#00D4AA', gradient: 'linear-gradient(90deg, #00D4AA, #4FC3F7)' },
-          { label: 'Escalations / Breaches', value: stats.escalated + stats.breached, icon: AlertTriangle, color: '#FF4444', gradient: 'linear-gradient(90deg, #FF4444, #FF6B6B)' },
+          { label: 'Assigned Complaints', value: stats.total, icon: FileText, color: '#2563EB', gradient: '#2563EB' },
+          { label: 'Pending Redressal', value: stats.pending, icon: Clock, color: '#D97706', gradient: '#D97706' },
+          { label: 'Successfully Resolved', value: stats.resolved, icon: CheckCircle, color: '#059669', gradient: '#059669' },
+          { label: 'Escalations / Breaches', value: stats.escalated + stats.breached, icon: AlertTriangle, color: '#DC2626', gradient: '#DC2626' },
         ].map(s => (
           <div key={s.label} className="stat-card" style={{ '--gradient': s.gradient }}>
-            <div className="stat-icon" style={{ background: `${s.color}20`, border: `1px solid ${s.color}30` }}>
-              <s.icon size={22} color={s.color} />
+            <div className="stat-icon" style={{ background: `${s.color}15`, border: `1px solid ${s.color}25` }}>
+              <s.icon size={18} color={s.color} />
             </div>
             <div className="stat-value">{loading ? '—' : s.value}</div>
             <div className="stat-label">{s.label}</div>

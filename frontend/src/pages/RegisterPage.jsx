@@ -31,31 +31,29 @@ export default function RegisterPage({ navigate }) {
   return (
     <div style={{
       minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'var(--bg-primary)', padding: '24px', position: 'relative', overflow: 'hidden'
+      background: 'var(--bg-primary)', padding: '24px'
     }}>
-      <div style={{ position: 'absolute', top: '-80px', left: '20%', width: '400px', height: '400px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(108,99,255,0.1) 0%, transparent 70%)', filter: 'blur(50px)', pointerEvents: 'none' }} />
-
-      <div style={{ width: '100%', maxWidth: '520px', animation: 'scaleIn 0.4s ease' }}>
-        <button className="btn btn-ghost btn-sm" style={{ marginBottom: '24px' }} onClick={() => navigate('#landing')}>
-          <ArrowLeft size={16} /> Back
+      <div style={{ width: '100%', maxWidth: '500px', animation: 'fadeIn 0.3s ease' }}>
+        <button className="btn btn-ghost btn-sm" style={{ marginBottom: '20px' }} onClick={() => navigate('#landing')}>
+          <ArrowLeft size={15} /> Back
         </button>
 
-        <div style={{ textAlign: 'center', marginBottom: '28px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '24px' }}>
           <div style={{
-            width: '60px', height: '60px', borderRadius: '18px',
-            background: 'linear-gradient(135deg, var(--primary), var(--accent))',
+            width: '48px', height: '48px', borderRadius: '10px',
+            background: 'var(--primary)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            margin: '0 auto 14px', boxShadow: '0 8px 32px rgba(108,99,255,0.35)'
+            margin: '0 auto 12px', boxShadow: '0 2px 8px rgba(37,99,235,0.25)'
           }}>
-            <GraduationCap size={28} color="white" />
+            <GraduationCap size={24} color="white" />
           </div>
-          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.7rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '4px' }}>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.375rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '3px' }}>
             Create Account
           </h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Join the EduGrieve Portal as a Student</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Join EduGrieve as a Student</p>
         </div>
 
-        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '24px', padding: '32px' }}>
+        <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '28px', boxShadow: 'var(--shadow-sm)' }}>
           {error && <div className="alert alert-error" style={{ marginBottom: '20px' }}>⚠️ {error}</div>}
 
           <form onSubmit={handleSubmit}>
@@ -127,15 +125,15 @@ export default function RegisterPage({ navigate }) {
               </div>
             </div>
 
-            <button type="submit" className="btn btn-primary full-width" style={{ height: '46px', marginTop: '4px' }} disabled={loading}>
-              {loading ? <div className="spinner-sm spinner" /> : '🎓 Create Student Account'}
+            <button type="submit" className="btn btn-primary full-width" style={{ height: '40px', marginTop: '4px' }} disabled={loading}>
+              {loading ? <div className="spinner-sm spinner" /> : 'Create Student Account'}
             </button>
           </form>
         </div>
 
-        <p style={{ textAlign: 'center', marginTop: '18px', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
+        <p style={{ textAlign: 'center', marginTop: '16px', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
           Already have an account?{' '}
-          <button onClick={() => navigate('#login')} style={{ background: 'none', border: 'none', color: 'var(--primary-light)', cursor: 'pointer', fontWeight: 600 }}>
+          <button onClick={() => navigate('#login')} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontWeight: 600 }}>
             Sign In
           </button>
         </p>

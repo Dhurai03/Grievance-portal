@@ -2,7 +2,7 @@ const Grievance = require('../models/Grievance');
 const Department = require('../models/Department');
 const Notification = require('../models/Notification');
 const AuditLog = require('../models/AuditLog');
-const { classifyGrievance } = require('../services/aiClassifier');
+const { classifyGrievance, findSimilarGrievances } = require('../services/aiClassifier');
 
 // Helper: create notification
 async function createNotification(recipientId, type, title, message, grievanceId = null, link = null) {
@@ -15,7 +15,8 @@ async function createNotification(recipientId, type, title, message, grievanceId
 
 // Helper: compute SLA deadline
 function computeSlaDeadline(priority, department) {
-  const hours = department?.slaConfig?.[priority] || 72;
+  const defaultHours = { CRITICAL: 24, HIGH: 48, MEDIUM: 72, LOW: 168 };
+  const hours = department?.slaConfig?.[priority] || defaultHours[priority] || 72;
   const deadline = new Date();
   deadline.setHours(deadline.getHours() + hours);
   return deadline;
@@ -30,12 +31,35 @@ exports.submitGrievance = async (req, res) => {
       return res.status(400).json({ error: 'Title and description are required.' });
     }
 
-    // AI Classification
-    const aiResult = await classifyGrievance(description + ' ' + title);
+    const fullText = `${title} ${description}`.trim();
+
+    // 1. AI Classification & Urgency (TF-IDF + Logistic Regression & Supervised Urgency Classifier)
+    const aiResult = await classifyGrievance(fullText);
 
     // Find department from AI result or category
     const departmentName = aiResult.department;
-    const dept = await Department.findOne({ name: departmentName });
+    const dept = await Department.findOne({
+      $or: [
+        { name: new RegExp(departmentName, 'i') },
+        { code: aiResult.departmentCode || '' }
+      ]
+    });
+
+    // 2. Duplicate & Similar Grievance Detection (Sentence Transformers + Cosine Similarity)
+    let similarityResult = { matches: [], totalMatches: 0, hasDuplicate: false };
+    try {
+      const candQuery = { status: { $nin: ['CLOSED', 'REJECTED'] } };
+      if (dept) candQuery.department = dept._id;
+
+      const candidates = await Grievance.find(candQuery)
+        .select('_id trackingId title description department status')
+        .limit(30)
+        .lean();
+
+      similarityResult = await findSimilarGrievances(fullText, candidates, 0.40);
+    } catch (simErr) {
+      console.warn('[Grievance] Duplicate check error during submission:', simErr.message);
+    }
 
     // Handle file attachments
     const attachments = req.files?.map(f => ({
@@ -45,6 +69,9 @@ exports.submitGrievance = async (req, res) => {
       size: f.size
     })) || [];
 
+    const urgencyData = aiResult.urgencyAnalysis || {};
+    const priority = aiResult.priority || 'MEDIUM';
+
     const grievance = await Grievance.create({
       title,
       description,
@@ -53,20 +80,42 @@ exports.submitGrievance = async (req, res) => {
       department: dept?._id || null,
       submittedBy: req.user._id,
       isAnonymous: isAnonymous === 'true' || isAnonymous === true,
-      priority: aiResult.priority,
+      priority,
       attachments,
       tags: tags ? (Array.isArray(tags) ? tags : tags.split(',').map(t => t.trim())) : [],
       aiClassification: {
         ...aiResult,
         classifiedAt: new Date()
       },
+      urgencyAnalysis: {
+        urgency: urgencyData.urgency || priority,
+        urgencyScore: urgencyData.urgencyScore || 0.5,
+        confidence: urgencyData.confidence || aiResult.confidence || 0.7,
+        flagForImmediateReview: urgencyData.flagForImmediateReview || ['HIGH', 'CRITICAL'].includes(priority),
+        technique: urgencyData.technique || 'Supervised Urgency Classifier'
+      },
+      flaggedForStaffReview: urgencyData.flagForImmediateReview || ['HIGH', 'CRITICAL'].includes(priority),
+      similarityAnalysis: {
+        hasDuplicate: similarityResult.hasDuplicate,
+        topMatchTrackingId: similarityResult.topMatch?.trackingId || null,
+        topMatchScore: similarityResult.topMatch?.similarityScore || 0,
+        similarCount: similarityResult.totalMatches,
+        matches: (similarityResult.matches || []).slice(0, 3).map(m => ({
+          trackingId: m.trackingId,
+          title: m.title,
+          similarityScore: m.similarityScore,
+          isDuplicate: m.isDuplicate
+        }))
+      },
       isAiRouted: aiResult.isAiRouted,
-      slaDeadline: computeSlaDeadline(aiResult.priority, dept),
+      slaDeadline: computeSlaDeadline(priority, dept),
       history: [{
         previousStatus: null,
         newStatus: 'SUBMITTED',
         changedBy: req.user._id,
-        remarks: 'Grievance submitted successfully.'
+        remarks: similarityResult.hasDuplicate
+          ? `Grievance submitted. Flagged: high similarity to existing ticket [${similarityResult.topMatch?.trackingId}].`
+          : 'Grievance submitted successfully.'
       }]
     });
 
@@ -81,7 +130,12 @@ exports.submitGrievance = async (req, res) => {
       performedBy: req.user._id,
       targetEntity: 'grievance',
       targetId: grievance._id,
-      metadata: { trackingId: grievance.trackingId, department: departmentName }
+      metadata: {
+        trackingId: grievance.trackingId,
+        department: departmentName,
+        urgency: priority,
+        hasDuplicate: similarityResult.hasDuplicate
+      }
     });
 
     // Notify student
@@ -89,7 +143,7 @@ exports.submitGrievance = async (req, res) => {
       req.user._id,
       'GRIEVANCE_SUBMITTED',
       '✅ Grievance Submitted',
-      `Your grievance "${title}" has been submitted successfully. Tracking ID: ${grievance.trackingId}`,
+      `Your grievance "${title}" has been registered. Tracking ID: ${grievance.trackingId}${similarityResult.hasDuplicate ? ' (Related active complaint recognized by AI)' : ''}`,
       grievance._id,
       `#grievance/detail/${grievance._id}`
     );
@@ -101,7 +155,7 @@ exports.submitGrievance = async (req, res) => {
           officerId,
           'GRIEVANCE_ASSIGNED',
           '📋 New Grievance in Your Department',
-          `A new ${aiResult.priority} priority grievance has been submitted: "${title}"`,
+          `A new ${priority} priority grievance has been submitted: "${title}"${similarityResult.hasDuplicate ? ' (⚠️ AI Duplicate Flag)' : ''}`,
           grievance._id,
           `#officer/grievance/${grievance._id}`
         );
@@ -115,7 +169,8 @@ exports.submitGrievance = async (req, res) => {
     res.status(201).json({
       message: 'Grievance submitted successfully!',
       grievance: populated,
-      aiClassification: aiResult
+      aiClassification: aiResult,
+      similarity: similarityResult
     });
   } catch (error) {
     console.error('[Grievance] Submit error:', error);
@@ -389,5 +444,81 @@ exports.aiClassify = async (req, res) => {
     res.json({ classification: result });
   } catch (error) {
     res.status(500).json({ error: 'AI classification failed.' });
+  }
+};
+
+// POST /api/grievances/audit-sla - Run SLA check on demand & return breached/at-risk stats
+exports.auditSlaBreaches = async (req, res) => {
+  try {
+    const User = require('../models/User');
+    const now = new Date();
+
+    // 1. Overdue and un-escalated
+    const breached = await Grievance.find({
+      status: { $nin: ['RESOLVED', 'CLOSED', 'REJECTED', 'ESCALATED'] },
+      slaDeadline: { $lt: now }
+    }).populate('submittedBy', 'name email').populate('department', 'name code');
+
+    const admins = await User.find({ role: { $in: ['admin', 'dean'] } }).select('_id');
+
+    let newlyEscalated = 0;
+    for (const g of breached) {
+      g.status = 'ESCALATED';
+      g.isSlaBreach = true;
+      g.escalatedAt = now;
+      g.escalationReason = 'Automated SLA Monitoring: Resolution deadline exceeded.';
+      g.history.push({
+        previousStatus: g.status,
+        newStatus: 'ESCALATED',
+        remarks: 'Auto-escalated by SLA Monitoring Engine due to expired resolution deadline.'
+      });
+      await g.save();
+      newlyEscalated++;
+
+      // Notify student
+      if (g.submittedBy?._id) {
+        await createNotification(
+          g.submittedBy._id,
+          'SLA_BREACH',
+          '⚠️ Grievance Auto-Escalated',
+          `Your grievance ${g.trackingId} exceeded the SLA resolution deadline and has been escalated to the Dean.`,
+          g._id,
+          `#grievance/detail/${g._id}`
+        );
+      }
+
+      // Notify Admins
+      for (const admin of admins) {
+        await createNotification(
+          admin._id,
+          'SLA_BREACH',
+          '🚨 SLA Breach Alert',
+          `Grievance ${g.trackingId} (${g.department?.name || 'Assigned'}) breached its SLA deadline and is escalated.`,
+          g._id,
+          `#admin/grievance/${g._id}`
+        );
+      }
+    }
+
+    // 2. Near breach: expiring within 6 hours
+    const sixHoursLater = new Date(now.getTime() + 6 * 60 * 60 * 1000);
+    const atRisk = await Grievance.find({
+      status: { $nin: ['RESOLVED', 'CLOSED', 'REJECTED', 'ESCALATED'] },
+      slaDeadline: { $gte: now, $lte: sixHoursLater }
+    }).select('trackingId title slaDeadline priority department').populate('department', 'name');
+
+    // 3. Total escalated tickets
+    const totalEscalated = await Grievance.countDocuments({ status: 'ESCALATED' });
+
+    res.json({
+      message: `SLA audit completed successfully. ${newlyEscalated} ticket(s) escalated.`,
+      newlyEscalated,
+      totalEscalated,
+      atRiskCount: atRisk.length,
+      atRisk
+    });
+  } catch (error) {
+    console.error('[SLA Audit] Controller error:', error);
+    res.status(500).json({ error: 'Server error during SLA audit.' });
   }
 };

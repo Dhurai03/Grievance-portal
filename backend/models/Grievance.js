@@ -66,6 +66,30 @@ const grievanceSchema = new mongoose.Schema({
   slaDeadline: { type: Date },
   isSlaBreach: { type: Boolean, default: false },
 
+  // Urgency & Severity AI Analysis (Technique: Supervised Text Classifier)
+  urgencyAnalysis: {
+    urgency: String,
+    urgencyScore: Number,
+    confidence: Number,
+    flagForImmediateReview: Boolean,
+    technique: String
+  },
+  flaggedForStaffReview: { type: Boolean, default: false },
+
+  // Duplicate & Similarity Detection (Technique: Sentence Transformers + Cosine Similarity)
+  similarityAnalysis: {
+    hasDuplicate: { type: Boolean, default: false },
+    topMatchTrackingId: String,
+    topMatchScore: Number,
+    similarCount: { type: Number, default: 0 },
+    matches: [{
+      trackingId: String,
+      title: String,
+      similarityScore: Number,
+      isDuplicate: Boolean
+    }]
+  },
+
   // Attachments
   attachments: [{
     filename: String,

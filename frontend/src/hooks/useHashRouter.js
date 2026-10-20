@@ -14,15 +14,17 @@ export function useHashRouter() {
     window.location.hash = newHash;
   };
 
-  // Parse route: #section/sub/id
+  // Parse route: #section/sub/id?param=value
   const parseRoute = (h) => {
-    const clean = h.replace('#', '');
-    const parts = clean.split('/');
+    const clean = h.replace(/^#\/?/, '');
+    const [pathPart, queryPart] = clean.split('?');
+    const parts = (pathPart || 'landing').split('/');
     return {
       base: parts[0] || 'landing',
       sub: parts[1] || null,
       id: parts[2] || null,
-      full: clean
+      full: clean,
+      queryString: queryPart || ''
     };
   };
 

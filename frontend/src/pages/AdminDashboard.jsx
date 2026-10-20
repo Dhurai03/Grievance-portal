@@ -99,79 +99,57 @@ export default function AdminDashboard({ navigate, route }) {
 
   return (
     <div className="page-content">
-      {/* Top Banner */}
-      <div style={{
-        background: 'linear-gradient(135deg, rgba(255,107,107,0.12), rgba(108,99,255,0.08))',
-        border: '1px solid var(--border-active)', borderRadius: '20px',
-        padding: '24px 28px', marginBottom: '24px',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        flexWrap: 'wrap', gap: '16px'
-      }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-            <span style={{
-              background: 'rgba(255,107,107,0.15)', color: '#FF6B6B',
-              padding: '3px 10px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 700
-            }}>CAMPUS ADMINISTRATION</span>
-            <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>• {user?.role === 'dean' ? 'Dean Portal' : 'System Admin'}</span>
+      {/* Welcome Banner */}
+      <div className="welcome-banner">
+        <div className="welcome-banner-text">
+          <div className="welcome-banner-tag">
+            🎓 {user?.role === 'dean' ? 'Dean Portal' : 'Campus Administration'}
           </div>
-          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', fontWeight: 800, marginBottom: '4px' }}>
-            Welcome, {user?.name}! 🎓
-          </h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-            Complete administrative control over departments, SLA timelines, student cases, and audit logs.
+          <h1>Welcome back, {user?.name?.split(' ')[0]}</h1>
+          <p>
+            {user?.role === 'dean'
+              ? 'Oversee all escalated cases, analytics and campus grievance resolution.'
+              : 'Full administrative control — departments, SLAs, users, and audit logs.'}
           </p>
         </div>
-
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button className="btn btn-ghost" onClick={loadData}>
-            <RefreshCw size={15} /> Refresh
+        <div className="welcome-banner-actions">
+          <button className="btn btn-secondary btn-sm" onClick={loadData}>
+            <RefreshCw size={14} /> Refresh
           </button>
           {activeTab === 'departments' && (
-            <button className="btn btn-primary" onClick={() => setShowDeptModal(true)}>
-              <PlusCircle size={15} /> New Department
+            <button className="btn btn-primary btn-sm" onClick={() => setShowDeptModal(true)}>
+              <PlusCircle size={14} /> New Department
             </button>
           )}
         </div>
       </div>
 
       {actionMsg && (
-        <div style={{
-          background: 'rgba(0,212,170,0.15)', border: '1px solid #00D4AA', color: '#00D4AA',
-          padding: '12px 18px', borderRadius: '12px', marginBottom: '20px',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between'
-        }}>
-          <span>✅ {actionMsg}</span>
-          <button onClick={() => setActionMsg('')} style={{ background: 'none', border: 'none', color: '#00D4AA', cursor: 'pointer' }}>✕</button>
+        <div className="alert alert-success" style={{ marginBottom: '16px' }}>
+          <CheckCircle size={16} />
+          <span>{actionMsg}</span>
+          <button
+            onClick={() => setActionMsg('')}
+            style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#065F46', cursor: 'pointer', fontSize: '1.125rem', lineHeight: 1 }}
+          >×</button>
         </div>
       )}
 
-      {/* Admin Subtabs Bar */}
-      <div style={{
-        display: 'flex', gap: '8px', borderBottom: '1px solid var(--border-color)',
-        paddingBottom: '12px', marginBottom: '24px', overflowX: 'auto'
-      }}>
+      {/* Admin Subtabs */}
+      <div className="admin-tabs">
         {[
-          { id: 'analytics', label: '📊 Overview & Analytics', icon: BarChart3 },
-          { id: 'departments', label: '🏛️ Departments & SLAs', icon: Building2 },
-          { id: 'users', label: '👥 User Management', icon: Users },
-          { id: 'escalated', label: '🚨 Escalated Cases', icon: AlertTriangle },
-          { id: 'audit', label: '🛡️ Audit Trail', icon: Shield },
+          { id: 'analytics', label: 'Overview & Analytics', icon: BarChart3 },
+          { id: 'departments', label: 'Departments & SLAs', icon: Building2 },
+          { id: 'users', label: 'User Management', icon: Users },
+          { id: 'escalated', label: 'Escalated Cases', icon: AlertTriangle },
+          { id: 'audit', label: 'Audit Trail', icon: Shield },
         ].map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '8px',
-              padding: '8px 16px', borderRadius: '12px',
-              border: 'none',
-              background: activeTab === tab.id ? 'var(--primary)' : 'var(--bg-card)',
-              color: activeTab === tab.id ? '#fff' : 'var(--text-secondary)',
-              fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer',
-              boxShadow: activeTab === tab.id ? '0 4px 12px rgba(108,99,255,0.3)' : 'none',
-              transition: 'all 0.2s ease', whiteSpace: 'nowrap'
-            }}
+            className={`admin-tab-btn${activeTab === tab.id ? ' active' : ''}`}
           >
+            <tab.icon size={15} />
             {tab.label}
           </button>
         ))}
@@ -181,16 +159,16 @@ export default function AdminDashboard({ navigate, route }) {
       {(activeTab === 'analytics' || activeTab === 'dashboard') && (
         <div>
           {/* Stat Cards */}
-          <div className="stats-grid" style={{ marginBottom: '24px' }}>
+          <div className="stats-grid" style={{ marginBottom: '20px' }}>
             {[
-              { label: 'Total Grievances', value: overview?.totalGrievances || 0, icon: FileText, color: '#6C63FF', gradient: 'linear-gradient(90deg, #6C63FF, #8B85FF)' },
-              { label: 'Resolution Rate', value: `${overview?.resolutionRate || 0}%`, icon: CheckCircle, color: '#00D4AA', gradient: 'linear-gradient(90deg, #00D4AA, #4FC3F7)' },
-              { label: 'Active Students', value: overview?.totalStudents || 0, icon: Users, color: '#4FC3F7', gradient: 'linear-gradient(90deg, #4FC3F7, #6C63FF)' },
-              { label: 'SLA Breaches', value: overview?.slaBreaches || 0, icon: AlertTriangle, color: '#FF4444', gradient: 'linear-gradient(90deg, #FF4444, #FF6B6B)' },
+              { label: 'Total Grievances', value: overview?.totalGrievances || 0, icon: FileText, color: '#2563EB', gradient: '#2563EB' },
+              { label: 'Resolution Rate', value: `${overview?.resolutionRate || 0}%`, icon: CheckCircle, color: '#059669', gradient: '#059669' },
+              { label: 'Active Students', value: overview?.totalStudents || 0, icon: Users, color: '#4F46E5', gradient: '#4F46E5' },
+              { label: 'SLA Breaches', value: overview?.slaBreaches || 0, icon: AlertTriangle, color: '#DC2626', gradient: '#DC2626' },
             ].map(s => (
               <div key={s.label} className="stat-card" style={{ '--gradient': s.gradient }}>
-                <div className="stat-icon" style={{ background: `${s.color}20`, border: `1px solid ${s.color}30` }}>
-                  <s.icon size={22} color={s.color} />
+                <div className="stat-icon" style={{ background: `${s.color}15`, border: `1px solid ${s.color}25` }}>
+                  <s.icon size={20} color={s.color} />
                 </div>
                 <div className="stat-value">{loading ? '—' : s.value}</div>
                 <div className="stat-label">{s.label}</div>
@@ -199,31 +177,31 @@ export default function AdminDashboard({ navigate, route }) {
           </div>
 
           {/* Breakdown Section */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
             {/* Status Breakdown Card */}
-            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '20px' }}>
-              <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Clock size={18} color="var(--primary)" /> Grievances by Lifecycle Stage
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '18px', boxShadow: 'var(--shadow-sm)' }}>
+              <h3 style={{ fontSize: '0.9375rem', fontWeight: 600, marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
+                <Clock size={16} color="var(--primary)" /> Grievances by Lifecycle Stage
               </h3>
               {overview?.byStatus ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {[
-                    { label: 'Submitted (Fresh)', val: overview.byStatus.submitted, color: '#4FC3F7' },
-                    { label: 'Under Review', val: overview.byStatus.underReview, color: '#FFB347' },
-                    { label: 'In Progress', val: overview.byStatus.inProgress, color: '#6C63FF' },
-                    { label: 'Resolved', val: overview.byStatus.resolved, color: '#00D4AA' },
-                    { label: 'Closed', val: overview.byStatus.closed, color: '#9B9BBF' },
-                    { label: 'Escalated to Dean', val: overview.byStatus.escalated, color: '#FF4444' },
+                    { label: 'Submitted (Fresh)', val: overview.byStatus.submitted, color: '#2563EB' },
+                    { label: 'Under Review', val: overview.byStatus.underReview, color: '#D97706' },
+                    { label: 'In Progress', val: overview.byStatus.inProgress, color: '#4F46E5' },
+                    { label: 'Resolved', val: overview.byStatus.resolved, color: '#059669' },
+                    { label: 'Closed', val: overview.byStatus.closed, color: '#64748B' },
+                    { label: 'Escalated to Dean', val: overview.byStatus.escalated, color: '#DC2626' },
                   ].map(item => {
                     const pct = overview.totalGrievances > 0 ? Math.round((item.val / overview.totalGrievances) * 100) : 0;
                     return (
                       <div key={item.label}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '4px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8125rem', marginBottom: '4px' }}>
                           <span style={{ color: 'var(--text-secondary)' }}>{item.label}</span>
-                          <span style={{ fontWeight: 700 }}>{item.val} ({pct}%)</span>
+                          <span style={{ fontWeight: 600 }}>{item.val} ({pct}%)</span>
                         </div>
-                        <div style={{ height: '8px', background: 'var(--bg-secondary)', borderRadius: '4px', overflow: 'hidden' }}>
-                          <div style={{ width: `${pct}%`, height: '100%', background: item.color, borderRadius: '4px' }} />
+                        <div style={{ height: '6px', background: 'var(--bg-tertiary)', borderRadius: '3px', overflow: 'hidden' }}>
+                          <div style={{ width: `${pct}%`, height: '100%', background: item.color, borderRadius: '3px' }} />
                         </div>
                       </div>
                     );
@@ -235,24 +213,24 @@ export default function AdminDashboard({ navigate, route }) {
             </div>
 
             {/* Department Summary Card */}
-            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '20px' }}>
-              <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Building2 size={18} color="#00D4AA" /> Department Routing Coverage
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '18px', boxShadow: 'var(--shadow-sm)' }}>
+              <h3 style={{ fontSize: '0.9375rem', fontWeight: 600, marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
+                <Building2 size={16} color="#059669" /> Department Routing Coverage
               </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '280px', overflowY: 'auto' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '280px', overflowY: 'auto' }}>
                 {departments.map(dept => (
                   <div key={dept._id} style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-secondary)',
+                    padding: '9px 12px', borderRadius: '8px', background: 'var(--bg-secondary)',
                     border: '1px solid var(--border-color)'
                   }}>
                     <div>
-                      <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>{dept.name}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Code: {dept.code} • {dept.officers?.length || 0} Officer(s)</div>
+                      <div style={{ fontWeight: 600, fontSize: '0.8125rem', color: 'var(--text-primary)' }}>{dept.name}</div>
+                      <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>Code: {dept.code} · {dept.officers?.length || 0} Officer(s)</div>
                     </div>
                     <span style={{
-                      background: 'rgba(0,212,170,0.15)', color: '#00D4AA',
-                      padding: '3px 8px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700
+                      background: '#D1FAE5', color: '#065F46',
+                      padding: '2px 8px', borderRadius: '6px', fontSize: '0.6875rem', fontWeight: 600
                     }}>
                       {dept.totalGrievances || 0} Tickets
                     </span>
@@ -382,11 +360,28 @@ export default function AdminDashboard({ navigate, route }) {
       {/* TAB 4: ESCALATED CASES */}
       {activeTab === 'escalated' && (
         <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', overflow: 'hidden' }}>
-          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#FF4444' }}>
-              🚨 Escalated Cases Requiring Executive Attention ({escalatedGrievances.length})
-            </h3>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Auto-escalated via SLA breach engine</span>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+            <div>
+              <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#FF4444' }}>
+                🚨 SLA Monitoring & Escalated Cases ({escalatedGrievances.length})
+              </h3>
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Automated background engine escalates overdue department tickets</span>
+            </div>
+            <button
+              className="btn btn-sm"
+              style={{ background: 'rgba(255,68,68,0.15)', color: '#FF6B6B', border: '1px solid rgba(255,68,68,0.3)', display: 'flex', alignItems: 'center', gap: '6px' }}
+              onClick={async () => {
+                try {
+                  const res = await api.auditSla();
+                  alert(`SLA Audit Completed: ${res.newlyEscalated} ticket(s) newly escalated. ${res.atRiskCount || 0} ticket(s) expiring within 6 hours.`);
+                  loadData();
+                } catch (err) {
+                  alert(err.message || 'Error running SLA audit');
+                }
+              }}
+            >
+              <RefreshCw size={14} /> Run Live SLA Audit
+            </button>
           </div>
 
           {escalatedGrievances.length === 0 ? (
@@ -471,14 +466,15 @@ export default function AdminDashboard({ navigate, route }) {
       {/* MODAL: CREATE DEPARTMENT */}
       {showDeptModal && (
         <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+          position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.45)', backdropFilter: 'blur(3px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '20px'
         }}>
           <div style={{
             background: 'var(--bg-card)', border: '1px solid var(--border-color)',
-            borderRadius: '20px', width: '100%', maxWidth: '480px', padding: '24px'
+            borderRadius: '12px', width: '100%', maxWidth: '480px', padding: '24px',
+            boxShadow: 'var(--shadow-xl)'
           }}>
-            <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '16px' }}>Add New Department</h3>
+            <h3 style={{ fontSize: '1.125rem', fontWeight: 700, marginBottom: '16px', color: 'var(--text-primary)' }}>Add New Department</h3>
             <form onSubmit={handleCreateDept} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div>
                 <label className="form-label">Department Name</label>
@@ -513,8 +509,8 @@ export default function AdminDashboard({ navigate, route }) {
                 />
               </div>
               <div style={{ display: 'flex', gap: '10px', marginTop: '10px', justifyContent: 'flex-end' }}>
-                <button type="button" className="btn btn-ghost" onClick={() => setShowDeptModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Create Department</button>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowDeptModal(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary btn-sm">Create Department</button>
               </div>
             </form>
           </div>
@@ -524,15 +520,16 @@ export default function AdminDashboard({ navigate, route }) {
       {/* MODAL: UPDATE USER ROLE */}
       {showRoleModal && selectedUser && (
         <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+          position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.45)', backdropFilter: 'blur(3px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '20px'
         }}>
           <div style={{
             background: 'var(--bg-card)', border: '1px solid var(--border-color)',
-            borderRadius: '20px', width: '100%', maxWidth: '420px', padding: '24px'
+            borderRadius: '12px', width: '100%', maxWidth: '420px', padding: '24px',
+            boxShadow: 'var(--shadow-xl)'
           }}>
-            <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '8px' }}>Modify User Role</h3>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
+            <h3 style={{ fontSize: '1.125rem', fontWeight: 700, marginBottom: '6px', color: 'var(--text-primary)' }}>Modify User Role</h3>
+            <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
               Updating role permissions for <strong>{selectedUser.name}</strong> ({selectedUser.email}).
             </p>
             <form onSubmit={handleUpdateRole} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -547,8 +544,8 @@ export default function AdminDashboard({ navigate, route }) {
                 </select>
               </div>
               <div style={{ display: 'flex', gap: '10px', marginTop: '10px', justifyContent: 'flex-end' }}>
-                <button type="button" className="btn btn-ghost" onClick={() => setShowRoleModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Save Role</button>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowRoleModal(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary btn-sm">Save Role</button>
               </div>
             </form>
           </div>

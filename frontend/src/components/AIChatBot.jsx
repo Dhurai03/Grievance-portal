@@ -1,21 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Sparkles, MessageSquare, X, Send, Key, Trash2,
+  Sparkles, MessageSquare, X, Send, Trash2,
   ChevronDown, ArrowRight, CheckCircle2, Bot, User,
-  ExternalLink, ShieldAlert
+  Clock, ShieldAlert, FileText, Search
 } from 'lucide-react';
 
 export default function AIChatBot({ navigate }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [apiKey, setApiKey] = useState(localStorage.getItem('gemini_api_key') || '');
-  const [tempApiKey, setTempApiKey] = useState(apiKey);
+  const [token, setToken] = useState(localStorage.getItem('token') || '');
 
   const [messages, setMessages] = useState([
     {
       id: 1,
       role: 'model',
-      content: "Hello! I'm **EduGrieve AI**, your 24/7 Campus Grievance Assistant. 🎓\n\nI can help you:\n- **Draft a complaint** with clear details for officers\n- Identify the **responsible college department** & **SLA deadline**\n- Explain **confidential/anonymous** anti-ragging reporting\n- Track the status of your existing ticket\n\nHow can I help you today?",
+      content: "Hello! I'm **EduGrieve AI**, your official Campus Grievance Assistant. 🎓\n\nI can help you:\n- **Draft clear complaints** with actionable details for department officers\n- **Check the real-time status** of your existing grievances\n- Explain college **SLA resolution deadlines** and anti-ragging protection\n\nHow can I assist you on campus today?",
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     }
   ]);
@@ -23,6 +21,12 @@ export default function AIChatBot({ navigate }) {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef(null);
+
+  useEffect(() => {
+    const handleStorage = () => setToken(localStorage.getItem('token') || '');
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -33,29 +37,6 @@ export default function AIChatBot({ navigate }) {
       scrollToBottom();
     }
   }, [messages, isOpen]);
-
-  const handleSaveApiKey = (e) => {
-    e.preventDefault();
-    const cleanKey = tempApiKey.trim();
-    setApiKey(cleanKey);
-    if (cleanKey) {
-      localStorage.setItem('gemini_api_key', cleanKey);
-    } else {
-      localStorage.removeItem('gemini_api_key');
-    }
-    setShowSettings(false);
-    setMessages(prev => [
-      ...prev,
-      {
-        id: Date.now(),
-        role: 'model',
-        content: cleanKey
-          ? "✅ Gemini API key updated. Live AI classification is active!"
-          : "ℹ️ API Key removed. Running intelligent local NLP mode.",
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      }
-    ]);
-  };
 
   const handleSend = async (textToSend) => {
     const text = (textToSend || input).trim();
@@ -73,12 +54,12 @@ export default function AIChatBot({ navigate }) {
     setLoading(true);
 
     try {
-      const token = localStorage.getItem('token');
+      const activeToken = localStorage.getItem('token');
       const res = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          ...(activeToken ? { 'Authorization': `Bearer ${activeToken}` } : {})
         },
         body: JSON.stringify({
           message: text,
@@ -87,7 +68,7 @@ export default function AIChatBot({ navigate }) {
       });
 
       const data = await res.json();
-      const reply = data.reply || "I've analyzed your concern. You can submit this as a formal grievance in the portal.";
+      const reply = data.reply || "I've analyzed your inquiry. You can register this as a formal complaint via the Submit Grievance tab.";
 
       setMessages(prev => [
         ...prev,
@@ -104,7 +85,7 @@ export default function AIChatBot({ navigate }) {
         {
           id: Date.now() + 1,
           role: 'model',
-          content: "I am having temporary trouble reaching the AI server. You can still file your complaint directly using the **Submit Grievance** form, and our system will route it automatically!",
+          content: "I am temporarily having trouble reaching the campus server. You can still file your complaint directly using the **Submit Grievance** form, and our system will route it automatically!",
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }
       ]);
@@ -118,18 +99,18 @@ export default function AIChatBot({ navigate }) {
       {
         id: Date.now(),
         role: 'model',
-        content: "Chat cleared. What can I assist you with on campus today?",
+        content: "Chat cleared. What campus issue can I assist you with?",
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       }
     ]);
   };
 
   const quickPrompts = [
-    { label: "Exam / Marks Issue", query: "My semester exam marks are missing on the portal and hall ticket is not issued. How to file?" },
-    { label: "Hostel & Room Maintenance", query: "The bathroom pipe in hostel block B is leaking and there is no water supply." },
-    { label: "Campus WiFi down", query: "Campus WiFi is not working in computer science lab 2 and login portal times out." },
-    { label: "Tuition Fee / Scholarship", query: "I paid tuition fees but receipt was not generated. Where to complain?" },
-    { label: "Anti-Ragging Help", query: "How to report ragging or bullying confidentially and anonymously?" }
+    { label: "🔍 Check My Ticket Status", query: "What is the status of my active grievances?" },
+    { label: "✍️ Draft Exam Grievance", query: "Help me draft a complaint about semester marks missing from student portal" },
+    { label: "🏢 Hostel Maintenance", query: "How to report broken bathroom pipe and water supply failure in hostel?" },
+    { label: "⏱️ College SLAs", query: "What are the department resolution SLA timeframes?" },
+    { label: "🚨 Anti-Ragging Help", query: "How do I report ragging confidentially and anonymously?" }
   ];
 
   return (
@@ -141,13 +122,13 @@ export default function AIChatBot({ navigate }) {
           position: 'fixed',
           bottom: '24px',
           right: '24px',
-          width: '56px',
-          height: '56px',
-          borderRadius: '28px',
-          background: 'linear-gradient(135deg, var(--primary), var(--accent))',
+          width: '52px',
+          height: '52px',
+          borderRadius: '26px',
+          background: 'var(--primary)',
           color: '#fff',
           border: 'none',
-          boxShadow: '0 8px 24px rgba(108, 99, 255, 0.4)',
+          boxShadow: '0 4px 16px rgba(37, 99, 235, 0.35)',
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
@@ -155,17 +136,17 @@ export default function AIChatBot({ navigate }) {
           zIndex: 999,
           transition: 'transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)'
         }}
-        onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.08)'}
+        onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.06)'}
         onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
-        title="Chat with EduGrieve AI"
+        title="Campus Assistant"
       >
-        {isOpen ? <X size={24} /> : (
+        {isOpen ? <X size={22} /> : (
           <div style={{ position: 'relative' }}>
-            <Sparkles size={24} />
+            <Sparkles size={22} />
             <span style={{
-              position: 'absolute', top: '-4px', right: '-4px',
-              width: '10px', height: '10px', borderRadius: '50%',
-              background: '#00D4AA', border: '2px solid #1a1a2e'
+              position: 'absolute', top: '-3px', right: '-3px',
+              width: '9px', height: '9px', borderRadius: '50%',
+              background: '#059669', border: '2px solid #ffffff'
             }} />
           </div>
         )}
@@ -175,7 +156,7 @@ export default function AIChatBot({ navigate }) {
       {isOpen && (
         <div style={{
           position: 'fixed',
-          bottom: '92px',
+          bottom: '88px',
           right: '24px',
           width: '380px',
           maxWidth: 'calc(100vw - 32px)',
@@ -183,8 +164,8 @@ export default function AIChatBot({ navigate }) {
           maxHeight: 'calc(100vh - 120px)',
           background: 'var(--bg-card)',
           border: '1px solid var(--border-color)',
-          borderRadius: '20px',
-          boxShadow: '0 16px 40px rgba(0,0,0,0.4)',
+          borderRadius: '12px',
+          boxShadow: 'var(--shadow-xl)',
           display: 'flex',
           flexDirection: 'column',
           zIndex: 999,
@@ -192,7 +173,7 @@ export default function AIChatBot({ navigate }) {
         }}>
           {/* Header */}
           <div style={{
-            padding: '16px 20px',
+            padding: '14px 18px',
             background: 'var(--bg-secondary)',
             borderBottom: '1px solid var(--border-color)',
             display: 'flex',
@@ -201,114 +182,65 @@ export default function AIChatBot({ navigate }) {
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <div style={{
-                width: '34px', height: '34px', borderRadius: '10px',
-                background: 'linear-gradient(135deg, var(--primary), var(--accent))',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: '#fff', fontSize: '1.1rem'
+                width: '32px', height: '32px', borderRadius: '6px',
+                background: 'var(--primary)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff'
               }}>
-                🎓
+                <Bot size={18} />
               </div>
               <div>
-                <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
-                  EduGrieve Assistant
-                </div>
-                <div style={{ fontSize: '0.72rem', color: '#00D4AA', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#00D4AA', display: 'inline-block' }} />
-                  Online • Auto Routing
-                </div>
+                <h3 style={{ fontSize: '0.875rem', fontWeight: 600, margin: 0, color: 'var(--text-primary)' }}>
+                  Campus Assistant
+                </h3>
+                <span style={{ fontSize: '0.6875rem', color: '#059669', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#059669', display: 'inline-block' }} />
+                  AI Guidance · Official Policy Guardrails
+                </span>
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               <button
                 onClick={clearChat}
-                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }}
-                title="Clear chat"
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '6px' }}
+                title="Clear Chat History"
               >
-                <Trash2 size={16} />
+                <Trash2 size={15} />
               </button>
               <button
                 onClick={() => setIsOpen(false)}
-                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }}
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '6px' }}
               >
-                <X size={18} />
+                <X size={17} />
               </button>
             </div>
           </div>
 
-          {/* Messages Scroll Area */}
-          <div style={{
-            flex: 1,
-            overflowY: 'auto',
-            padding: '16px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '12px'
-          }}>
-            {messages.map(m => {
-              const isUser = m.role === 'user';
-              return (
-                <div
-                  key={m.id}
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: isUser ? 'flex-end' : 'flex-start',
-                    maxWidth: '88%',
-                    alignSelf: isUser ? 'flex-end' : 'flex-start'
-                  }}
-                >
-                  <div style={{
-                    padding: '10px 14px',
-                    borderRadius: isUser ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-                    background: isUser ? 'var(--primary)' : 'var(--bg-secondary)',
-                    color: isUser ? '#fff' : 'var(--text-primary)',
-                    fontSize: '0.85rem',
-                    lineHeight: '1.45',
-                    wordBreak: 'break-word',
-                    whiteSpace: 'pre-wrap',
-                    border: isUser ? 'none' : '1px solid var(--border-color)'
-                  }}>
-                    {m.content}
-                  </div>
-                  <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '3px', padding: '0 4px' }}>
-                    {m.timestamp}
-                  </span>
-                </div>
-              );
-            })}
-
-            {loading && (
-              <div style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 14px', background: 'var(--bg-secondary)', borderRadius: '14px', border: '1px solid var(--border-color)' }}>
-                <span className="spinner" style={{ width: '14px', height: '14px' }} />
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>AI analyzing query...</span>
-              </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-
-          {/* Quick Suggestion Chips */}
+          {/* Quick Prompts Carousel */}
           <div style={{
             padding: '8px 12px',
+            background: 'var(--bg-tertiary)',
+            borderBottom: '1px solid var(--border-color)',
             display: 'flex',
             gap: '6px',
             overflowX: 'auto',
-            borderTop: '1px solid var(--border-color)',
-            background: 'var(--bg-primary)'
+            whiteSpace: 'nowrap',
+            scrollbarWidth: 'none'
           }}>
-            {quickPrompts.slice(0, 3).map((qp, i) => (
+            {quickPrompts.map((qp, idx) => (
               <button
-                key={i}
+                key={idx}
                 onClick={() => handleSend(qp.query)}
+                disabled={loading}
                 style={{
-                  background: 'var(--bg-secondary)',
+                  background: 'var(--bg-card)',
                   border: '1px solid var(--border-color)',
-                  borderRadius: '12px',
-                  padding: '4px 10px',
-                  fontSize: '0.72rem',
+                  borderRadius: '16px',
+                  padding: '3px 10px',
+                  fontSize: '0.6875rem',
                   color: 'var(--text-secondary)',
                   cursor: 'pointer',
-                  whiteSpace: 'nowrap'
+                  flexShrink: 0
                 }}
               >
                 {qp.label}
@@ -316,13 +248,94 @@ export default function AIChatBot({ navigate }) {
             ))}
           </div>
 
-          {/* Input Bar */}
+          {/* Messages Body */}
+          <div style={{
+            flex: 1,
+            overflowY: 'auto',
+            padding: '14px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '10px'
+          }}>
+            {messages.map(msg => (
+              <div
+                key={msg.id}
+                style={{
+                  display: 'flex',
+                  gap: '8px',
+                  flexDirection: msg.role === 'user' ? 'row-reverse' : 'row',
+                  alignItems: 'flex-start'
+                }}
+              >
+                <div style={{
+                  width: '26px', height: '26px', borderRadius: '50%',
+                  background: msg.role === 'user' ? 'var(--primary)' : '#EFF6FF',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: msg.role === 'user' ? '#fff' : 'var(--primary)',
+                  flexShrink: 0, fontSize: '0.75rem', fontWeight: 600
+                }}>
+                  {msg.role === 'user' ? <User size={13} /> : <Bot size={13} />}
+                </div>
+
+                <div style={{
+                  maxWidth: '82%',
+                  background: msg.role === 'user' ? 'var(--primary)' : 'var(--bg-secondary)',
+                  border: msg.role === 'user' ? 'none' : '1px solid var(--border-color)',
+                  color: msg.role === 'user' ? '#fff' : 'var(--text-primary)',
+                  padding: '9px 12px',
+                  borderRadius: msg.role === 'user' ? '10px 10px 2px 10px' : '10px 10px 10px 2px',
+                  fontSize: '0.8125rem',
+                  lineHeight: 1.5,
+                  wordBreak: 'break-word',
+                  boxShadow: 'var(--shadow-sm)'
+                }}>
+                  <div style={{ whiteSpace: 'pre-wrap' }}>
+                    {msg.content}
+                  </div>
+                  <div style={{
+                    fontSize: '0.625rem',
+                    color: msg.role === 'user' ? 'rgba(255,255,255,0.7)' : 'var(--text-muted)',
+                    marginTop: '3px',
+                    textAlign: 'right'
+                  }}>
+                    {msg.timestamp}
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {loading && (
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <div style={{
+                  width: '26px', height: '26px', borderRadius: '50%',
+                  background: '#EFF6FF',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: 'var(--primary)', flexShrink: 0
+                }}>
+                  <Bot size={13} />
+                </div>
+                <div style={{
+                  background: 'var(--bg-secondary)',
+                  border: '1px solid var(--border-color)',
+                  padding: '7px 12px',
+                  borderRadius: '10px',
+                  fontSize: '0.75rem',
+                  color: 'var(--text-muted)'
+                }}>
+                  Processing inquiry...
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Input Footer */}
           <form
-            onSubmit={(e) => { e.preventDefault(); handleSend(); }}
+            onSubmit={e => { e.preventDefault(); handleSend(); }}
             style={{
-              padding: '12px',
-              borderTop: '1px solid var(--border-color)',
+              padding: '10px 14px',
               background: 'var(--bg-secondary)',
+              borderTop: '1px solid var(--border-color)',
               display: 'flex',
               gap: '8px',
               alignItems: 'center'
@@ -330,31 +343,39 @@ export default function AIChatBot({ navigate }) {
           >
             <input
               type="text"
-              placeholder="Ask about exam, hostel, fee, Wi-Fi..."
-              className="form-control"
-              style={{ flex: 1, height: '38px', fontSize: '0.85rem' }}
+              placeholder="Ask about drafting, SLAs, or ticket status..."
               value={input}
               onChange={e => setInput(e.target.value)}
               disabled={loading}
+              style={{
+                flex: 1,
+                background: 'var(--bg-input)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '8px',
+                padding: '8px 12px',
+                color: 'var(--text-primary)',
+                fontSize: '0.8125rem',
+                outline: 'none'
+              }}
             />
             <button
               type="submit"
               disabled={loading || !input.trim()}
               style={{
-                width: '38px',
-                height: '38px',
-                borderRadius: '10px',
                 background: 'var(--primary)',
-                color: '#fff',
                 border: 'none',
-                cursor: 'pointer',
+                borderRadius: '8px',
+                width: '36px',
+                height: '36px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                opacity: (!input.trim() || loading) ? 0.6 : 1
+                color: '#fff',
+                cursor: loading || !input.trim() ? 'not-allowed' : 'pointer',
+                opacity: loading || !input.trim() ? 0.5 : 1
               }}
             >
-              <Send size={16} />
+              <Send size={15} />
             </button>
           </form>
         </div>

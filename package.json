@@ -9,6 +9,8 @@
     "server": "npm --prefix backend run start",
     "backend": "npm --prefix backend run start",
     "seed": "npm --prefix backend run seed",
+    "ai": "python backend/ai_engine/service.py",
+    "train:ai": "python backend/ai_engine/train_models.py",
     "test:backend": "node backend/tests/verify.js",
     "build:frontend": "npm --prefix frontend run build"
   }

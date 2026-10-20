@@ -48,46 +48,47 @@ export default function GrievanceListPage({ navigate }) {
       {/* Filters */}
       <div style={{
         background: 'var(--bg-card)', border: '1px solid var(--border-color)',
-        borderRadius: '16px', padding: '16px 20px', marginBottom: '20px',
-        display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center'
+        borderRadius: '10px', padding: '14px 18px', marginBottom: '18px',
+        display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center',
+        boxShadow: 'var(--shadow-sm)'
       }}>
         <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
           <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
           <input
             type="text" placeholder="Search by title, tracking ID..."
-            className="form-control" style={{ paddingLeft: '36px', height: '38px' }}
+            className="form-control" style={{ paddingLeft: '36px', height: '36px' }}
             value={filters.search}
             onChange={e => handleFilter('search', e.target.value)}
           />
         </div>
-        <select className="form-control" style={{ width: 'auto', minWidth: '140px', height: '38px' }} value={filters.status} onChange={e => handleFilter('status', e.target.value)}>
+        <select className="form-control" style={{ width: 'auto', minWidth: '130px', height: '36px' }} value={filters.status} onChange={e => handleFilter('status', e.target.value)}>
           <option value="">All Status</option>
           {STATUS_OPTIONS.filter(Boolean).map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
         </select>
-        <select className="form-control" style={{ width: 'auto', minWidth: '130px', height: '38px' }} value={filters.priority} onChange={e => handleFilter('priority', e.target.value)}>
+        <select className="form-control" style={{ width: 'auto', minWidth: '130px', height: '36px' }} value={filters.priority} onChange={e => handleFilter('priority', e.target.value)}>
           <option value="">All Priority</option>
           {PRIORITY_OPTIONS.filter(Boolean).map(p => <option key={p} value={p}>{p}</option>)}
         </select>
-        <select className="form-control" style={{ width: 'auto', minWidth: '130px', height: '38px' }} value={filters.order} onChange={e => handleFilter('order', e.target.value)}>
+        <select className="form-control" style={{ width: 'auto', minWidth: '130px', height: '36px' }} value={filters.order} onChange={e => handleFilter('order', e.target.value)}>
           <option value="desc">Newest First</option>
           <option value="asc">Oldest First</option>
         </select>
       </div>
 
       {/* Table */}
-      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', overflow: 'hidden' }}>
+      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '10px', overflow: 'hidden', boxShadow: 'var(--shadow-sm)' }}>
         {loading ? (
-          <div style={{ padding: '40px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {[1, 2, 3, 4, 5].map(i => <div key={i} className="skeleton" style={{ height: '60px' }} />)}
+          <div style={{ padding: '30px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {[1, 2, 3, 4, 5].map(i => <div key={i} className="skeleton" style={{ height: '50px' }} />)}
           </div>
         ) : grievances.length === 0 ? (
-          <div className="empty-state" style={{ padding: '60px' }}>
-            <FileText size={44} />
-            <h3>No Grievances Found</h3>
+          <div className="empty-state" style={{ padding: '48px' }}>
+            <FileText size={40} color="var(--text-muted)" />
+            <h3 style={{ marginTop: '10px' }}>No Grievances Found</h3>
             <p>Try adjusting your filters or submit a new grievance.</p>
           </div>
         ) : (
-          <div className="table-wrapper" style={{ borderRadius: '16px', border: 'none' }}>
+          <div className="table-wrapper" style={{ borderRadius: '10px', border: 'none' }}>
             <table>
               <thead>
                 <tr>
@@ -104,20 +105,20 @@ export default function GrievanceListPage({ navigate }) {
                 {grievances.map(g => (
                   <tr key={g._id} style={{ cursor: 'pointer' }} onClick={() => navigate(`#grievance/${g._id}`)}>
                     <td>
-                      <span style={{ fontFamily: 'monospace', fontSize: '0.8rem', color: 'var(--primary-light)' }}>{g.trackingId}</span>
+                      <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: '0.75rem', color: '#1E40AF', background: '#EFF6FF', border: '1px solid #BFDBFE', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>{g.trackingId}</span>
                     </td>
                     <td>
-                      <div style={{ fontWeight: 600, fontSize: '0.875rem', maxWidth: '240px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <div style={{ fontWeight: 600, fontSize: '0.8125rem', maxWidth: '240px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {g.title}
                       </div>
-                      {g.isAnonymous && <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>🕵️ Anonymous</span>}
+                      {g.isAnonymous && <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>🔒 Anonymous</span>}
                     </td>
-                    <td><span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{g.category}</span></td>
-                    <td><span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{g.department?.name || '—'}</span></td>
+                    <td><span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>{g.category}</span></td>
+                    <td><span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>{g.department?.name || '—'}</span></td>
                     <td><span className={`badge badge-${g.priority?.toLowerCase()}`}>{g.priority}</span></td>
                     <td><span className={`badge badge-${g.status?.toLowerCase()}`}>{g.status?.replace('_', ' ')}</span></td>
                     <td>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                         <Clock size={11} style={{ verticalAlign: 'middle', marginRight: '3px' }} />
                         {formatDate(g.createdAt)}
                       </div>

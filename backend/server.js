@@ -1,7 +1,7 @@
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 const express = require('express');
 const cors = require('cors');
-const path = require('path');
 const fs = require('fs');
 const connectDB = require('./config/db');
 
@@ -101,14 +101,16 @@ const checkSLABreaches = async () => {
       await g.save();
 
       // Notify student
-      await Notification.create({
-        recipient: g.submittedBy._id,
-        grievance: g._id,
-        type: 'SLA_BREACH',
-        title: '⚠️ Grievance Escalated',
-        message: `Your grievance ${g.trackingId} has exceeded the SLA timeline and has been escalated.`,
-        link: `#grievance/detail/${g._id}`
-      });
+      if (g.submittedBy?._id) {
+        await Notification.create({
+          recipient: g.submittedBy._id,
+          grievance: g._id,
+          type: 'SLA_BREACH',
+          title: '⚠️ Grievance Escalated',
+          message: `Your grievance ${g.trackingId} has exceeded the SLA timeline and has been escalated to the Dean.`,
+          link: `#grievance/detail/${g._id}`
+        });
+      }
 
       // Notify admins/dean
       for (const admin of admins) {
@@ -130,6 +132,19 @@ const checkSLABreaches = async () => {
 // Start server
 const startServer = async () => {
   await connectDB();
+
+  // Auto-seed if departments collection is empty
+  try {
+    const Department = require('./models/Department');
+    const deptCount = await Department.countDocuments();
+    if (deptCount === 0) {
+      console.log('📦 Database appears unseeded. Auto-seeding initial departments and demo accounts...');
+      const { seedData } = require('./seed');
+      await seedData();
+    }
+  } catch (seedErr) {
+    console.warn('⚠️ Auto-seed check skipped or failed:', seedErr.message);
+  }
 
   app.listen(PORT, () => {
     console.log('\n🎓 College Grievance Portal Backend');

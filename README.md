@@ -12,30 +12,33 @@ The platform provides real-time grievance tracking, automated SLA breach escalat
 
 ---
 
-## 🌟 Key Highlights
+## 🌟 Key Highlights & AI Modules
 
-- **🤖 AI-Enabled NLP Routing Engine**:
-  - Automatically parses complaint descriptions to classify category, subcategory, urgency, and routing department code.
-  - Context-aware routing for Academic Affairs, Hostel & Mess, Campus IT/WiFi, Finance/Fees, Library, Placement, and Anti-Ragging.
-  - Seamless dual-mode: Operates via live **Google Gemini LLM** (`gemini-1.5-flash`) or built-in offline heuristic NLP engine.
-  - Interactive floating campus AI assistant to guide students on drafting complaints and understanding SLA timelines.
+### 1. 🤖 Core AI: NLP-Based Department & Category Classification
+- **Technique**: **TF-IDF + Multinomial Logistic Regression** (`scikit-learn`).
+- Predicts department, category, subcategory, and routing code from student complaint text (e.g., examination-mark discrepancies route automatically to `Academic Affairs - ACAD`).
+- Calibrated probability outputs with top prediction rankings.
 
-- **🏛️ Multi-Role Campus Workspaces**:
-  - **Students**: Multi-step submission wizard, file/evidence uploads, anonymous filing mode, feedback rating, and real-time timeline tracking.
-  - **Department Officers & Faculty**: Departmental queues, SLA countdown timers, review tools, assignment, and status transitions.
-  - **Administrators & Dean**: High-level analytics, department & SLA configuration, user role management, system audit trail, and escalated emergency cases.
+### 2. 🔍 Recommended AI: Duplicate & Similar Grievance Detection
+- **Technique**: **Sentence Transformers (`all-MiniLM-L6-v2`) + Cosine Similarity**.
+- Distinct from classification: Computes semantic vector embeddings to detect existing active tickets with identical or recurring meanings, even with completely different wording.
+- Alerts students during submission and helps officers group systemic campus issues (e.g., campus-wide WiFi outages).
 
-- **⏱️ Automated SLA & Escalation Engine**:
-  - Background audits continuously monitor resolution deadlines based on department SLA configs (Critical: 24h, High: 48h, Medium: 72h, Low: 7 days).
-  - Breached tickets are automatically escalated directly to the Dean of Students with instant alert generation.
+### 3. ⚡ Recommended AI: Complaint Severity & Urgency Detection
+- **Technique**: **Separate Supervised Text Classifier** trained on time consequence, academic stakes, and campus safety risk.
+- Crucially separates genuine urgency from emotional sentiment alone (e.g. calm deadline/safety reports receive HIGH/CRITICAL; angry aesthetic requests receive LOW).
+- Flags critical issues for mandatory executive staff review.
 
-- **🔍 Public & Anonymous Tracking**:
-  - Secure tracking via unique identifiers (`EDU-2026-XXXX`).
-  - Visual resolution progress stepper and history audit log.
+### 4. 💬 Generative AI: Campus Grievance Assistant
+- **Technique**: **Google Gemini API** (`gemini-1.5-flash`) kept strictly on the backend.
+- Enforces institutional guardrails (restricting conversations to campus redressal policies and procedures).
+- **Complaint Drafting Assistant**: Converts unstructured student notes into clear, formal, actionable grievances with suggested evidence checklists.
+- **Authenticated Status Lookup**: Directly queries the student's authenticated grievance records to report real-time status, timeline, and next steps.
 
-- **🛡️ Enterprise Security & Storage**:
-  - **MongoDB** storage with Mongoose schemas for flexible, scalable student data management.
-  - JWT authentication, bcrypt password hashing, role-based access control (RBAC), and tamper-evident audit logging.
+### 5. ⏱️ SLA Monitoring & Automatic Escalation
+- Department-specific resolution deadlines (e.g., Anti-Ragging: 24h, Welfare: 24h, Academic: 48h, Hostel/IT: 48h, Library/Finance: 72h-120h).
+- Automated background engine continuously monitors deadlines, flags overdue tickets, auto-escalates to the Dean of Students, and generates breach notifications.
+- Admin/Officer dashboard controls with live on-demand SLA audit and at-risk early warning detection.
 
 ---
 

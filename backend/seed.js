@@ -3,7 +3,8 @@
  * Run: node backend/seed.js
  */
 
-require('dotenv').config({ path: './backend/.env' });
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 const mongoose = require('mongoose');
 const connectDB = require('./config/db');
 const User = require('./models/User');
@@ -33,47 +34,62 @@ const USERS = [
   { name: 'Student Arjun S', email: 'student@college.edu', password: 'student123', role: 'student', studentId: 'CS2024001', department: 'Computer Science', year: 2, section: 'A' },
 ];
 
-async function seed() {
-  try {
-    await connectDB();
-    console.log('\n🌱 Starting database seed...\n');
+async function seedData() {
+  console.log('\n🌱 Checking and seeding initial database data...\n');
 
-    // Clear existing data
-    await Promise.all([User.deleteMany({}), Department.deleteMany({})]);
-    console.log('✅ Cleared existing data');
+  // Upsert departments
+  const deptMap = {};
+  for (const deptData of DEPARTMENTS) {
+    const d = await Department.findOneAndUpdate(
+      { code: deptData.code },
+      { $set: deptData },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+    deptMap[d.code] = d;
+  }
+  console.log(`✅ Verified/Created ${DEPARTMENTS.length} departments`);
 
-    // Create departments
-    const departments = await Department.insertMany(DEPARTMENTS);
-    console.log(`✅ Created ${departments.length} departments`);
-
-    const deptMap = {};
-    departments.forEach(d => { deptMap[d.code] = d; });
-
-    // Create users
-    for (const userData of USERS) {
-      const user = new User(userData);
-      if (userData.role === 'officer') {
-        // Assign to relevant dept
-        if (userData.email.includes('academic')) user.assignedDepartment = deptMap['ACAD']._id;
-        if (userData.email.includes('hostel')) user.assignedDepartment = deptMap['HSTL']._id;
-        if (userData.email.includes('it')) user.assignedDepartment = deptMap['IT']._id;
-      }
-      await user.save();
-      console.log(`✅ Created user: ${user.email} (${user.role})`);
+  // Upsert demo users
+  for (const userData of USERS) {
+    let user = await User.findOne({ email: userData.email.toLowerCase() });
+    if (!user) {
+      user = new User(userData);
+    } else {
+      user.name = userData.name;
+      user.role = userData.role;
+      user.password = userData.password;
+      if (userData.studentId) user.studentId = userData.studentId;
+      if (userData.designation) user.designation = userData.designation;
     }
 
-    console.log('\n🎉 Database seeded successfully!');
-    console.log('\n📋 Login credentials:');
-    console.log('   Admin:   admin@college.edu / admin123');
-    console.log('   Dean:    dean@college.edu / dean123');
-    console.log('   Officer: academic.officer@college.edu / officer123');
-    console.log('   Student: student@college.edu / student123\n');
+    if (userData.role === 'officer') {
+      if (userData.email.includes('academic')) user.assignedDepartment = deptMap['ACAD']?._id;
+      if (userData.email.includes('hostel')) user.assignedDepartment = deptMap['HSTL']?._id;
+      if (userData.email.includes('it')) user.assignedDepartment = deptMap['IT']?._id;
+    }
 
-    process.exit(0);
-  } catch (error) {
-    console.error('❌ Seed error:', error);
-    process.exit(1);
+    await user.save();
+    console.log(`✅ Verified/Created user: ${user.email} (${user.role})`);
   }
+
+  console.log('\n🎉 Database ready with demo credentials:');
+  console.log('   Admin:   admin@college.edu / admin123');
+  console.log('   Dean:    dean@college.edu / dean123');
+  console.log('   Officer: academic.officer@college.edu / officer123');
+  console.log('   Student: student@college.edu / student123\n');
 }
 
-seed();
+if (require.main === module) {
+  (async () => {
+    try {
+      await connectDB();
+      await seedData();
+      process.exit(0);
+    } catch (error) {
+      console.error('❌ Seed error:', error);
+      process.exit(1);
+    }
+  })();
+}
+
+module.exports = { seedData, DEPARTMENTS, USERS };

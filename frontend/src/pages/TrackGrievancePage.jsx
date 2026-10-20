@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import api from '../services/api';
-import { Search, CheckCircle, Clock, Building2, AlertTriangle, ArrowLeft, GraduationCap } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { Search, CheckCircle, AlertTriangle, ArrowLeft, GraduationCap } from 'lucide-react';
 
 export default function TrackGrievancePage({ navigate }) {
+  const { user } = useAuth();
   const [trackingId, setTrackingId] = useState(() => {
     const params = new URLSearchParams(window.location.hash.split('?')[1] || '');
     return params.get('id') || '';
@@ -24,14 +26,32 @@ export default function TrackGrievancePage({ navigate }) {
     setLoading(false);
   };
 
+  React.useEffect(() => {
+    if (trackingId.trim()) {
+      handleTrack();
+    }
+  }, []);
+
+  const handleGoBack = () => {
+    if (window.history.length > 1) {
+      window.history.back();
+    } else if (user) {
+      if (user.role === 'student') navigate('#student/dashboard');
+      else if (user.role === 'officer' || user.role === 'faculty') navigate('#officer/dashboard');
+      else navigate('#admin/dashboard');
+    } else {
+      navigate('#landing');
+    }
+  };
+
   const STATUS_INFO = {
-    SUBMITTED: { icon: '📬', color: '#4FC3F7', desc: 'Your grievance has been received and is awaiting review.' },
-    UNDER_REVIEW: { icon: '🔍', color: '#FFB347', desc: 'Your grievance is being reviewed by the department.' },
-    IN_PROGRESS: { icon: '⚙️', color: '#6C63FF', desc: 'The department is actively working to resolve your issue.' },
-    RESOLVED: { icon: '✅', color: '#00D4AA', desc: 'Your grievance has been resolved. Please provide feedback.' },
-    CLOSED: { icon: '🔒', color: '#9B9BBF', desc: 'Your grievance has been closed.' },
-    REJECTED: { icon: '❌', color: '#FF6B6B', desc: 'Your grievance has been rejected. Contact the department for details.' },
-    ESCALATED: { icon: '🚨', color: '#FF4444', desc: 'Your grievance has been escalated to senior management.' },
+    SUBMITTED: { icon: '📬', color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE', desc: 'Your grievance has been received and is awaiting departmental review.' },
+    UNDER_REVIEW: { icon: '🔍', color: '#D97706', bg: '#FEF3C7', border: '#FDE68A', desc: 'Your grievance is currently under active evaluation by the department.' },
+    IN_PROGRESS: { icon: '⚙️', color: '#4F46E5', bg: '#EEF2FF', border: '#C7D2FE', desc: 'The designated officer is taking action to address your complaint.' },
+    RESOLVED: { icon: '✅', color: '#059669', bg: '#ECFDF5', border: '#A7F3D0', desc: 'Your grievance has been successfully addressed and resolved.' },
+    CLOSED: { icon: '🔒', color: '#475569', bg: '#F1F5F9', border: '#CBD5E1', desc: 'The ticket has completed its lifecycle and is officially closed.' },
+    REJECTED: { icon: '❌', color: '#DC2626', bg: '#FEF2F2', border: '#FECACA', desc: 'The complaint could not be processed under current guidelines.' },
+    ESCALATED: { icon: '🚨', color: '#DC2626', bg: '#FEF2F2', border: '#FECACA', desc: 'Your grievance exceeded initial SLA limits and is escalated to the Dean.' },
   };
 
   const STEPS = ['SUBMITTED', 'UNDER_REVIEW', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'];
@@ -40,41 +60,42 @@ export default function TrackGrievancePage({ navigate }) {
     <div style={{
       minHeight: '100vh', background: 'var(--bg-primary)',
       display: 'flex', flexDirection: 'column', alignItems: 'center',
-      padding: '24px', position: 'relative', overflow: 'hidden'
+      padding: '24px'
     }}>
-      <div style={{ position: 'absolute', top: '5%', left: '10%', width: '400px', height: '400px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(108,99,255,0.1) 0%, transparent 70%)', filter: 'blur(50px)', pointerEvents: 'none' }} />
-
       {/* Nav */}
-      <nav style={{ width: '100%', maxWidth: '700px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '48px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }} onClick={() => navigate('#landing')}>
-          <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'linear-gradient(135deg, var(--primary), var(--primary-light))', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <GraduationCap size={18} color="white" />
-          </div>
-          <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, color: 'var(--text-primary)' }}>EduGrieve</span>
-        </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button className="btn btn-ghost btn-sm" onClick={() => navigate('#login')}>Sign In</button>
-          <button className="btn btn-primary btn-sm" onClick={() => navigate('#register')}>Register</button>
-        </div>
-      </nav>
+      
+             
+      <div style={{ width: '100%', maxWidth: '680px' }}>
+        <button
+          onClick={handleGoBack}
+          className="btn btn-ghost btn-sm"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            marginBottom: '16px',
+            color: 'var(--text-secondary)',
+            fontWeight: 500
+          }}
+        >
+          <ArrowLeft size={15} /> Back
+        </button>
 
-      <div style={{ width: '100%', maxWidth: '680px', animation: 'fadeIn 0.5s ease' }}>
-        <div style={{ textAlign: 'center', marginBottom: '36px' }}>
-          <div style={{ fontSize: '3rem', marginBottom: '12px' }}>🔍</div>
-          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '8px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '28px' }}>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.625rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '6px' }}>
             Track Your Grievance
           </h1>
-          <p style={{ color: 'var(--text-muted)' }}>Enter your tracking ID to check the real-time status of your grievance</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Enter your tracking ID to check the real-time status and SLA progress</p>
         </div>
 
         {/* Search Form */}
         <form onSubmit={handleTrack} style={{
-          display: 'flex', gap: '12px', background: 'var(--bg-card)',
-          border: '1px solid var(--border-color)', borderRadius: '20px',
-          padding: '8px 8px 8px 20px', marginBottom: '28px',
-          boxShadow: 'var(--shadow-md)'
+          display: 'flex', gap: '10px', background: 'var(--bg-card)',
+          border: '1px solid var(--border-color)', borderRadius: '10px',
+          padding: '6px 6px 6px 14px', marginBottom: '24px',
+          boxShadow: 'var(--shadow-sm)'
         }}>
-          <Search size={20} color="var(--text-muted)" style={{ flexShrink: 0, marginTop: '10px' }} />
+          <Search size={18} color="var(--text-muted)" style={{ flexShrink: 0, marginTop: '9px' }} />
           <input
             type="text"
             placeholder="Enter tracking ID (e.g., EDU-2026-00001)"
@@ -82,11 +103,11 @@ export default function TrackGrievancePage({ navigate }) {
             onChange={e => setTrackingId(e.target.value)}
             style={{
               flex: 1, background: 'transparent', border: 'none', outline: 'none',
-              color: 'var(--text-primary)', fontSize: '1rem', fontFamily: 'monospace'
+              color: 'var(--text-primary)', fontSize: '0.9375rem', fontFamily: 'ui-monospace, monospace'
             }}
           />
-          <button type="submit" className="btn btn-primary" disabled={loading || !trackingId.trim()}>
-            {loading ? <div className="spinner spinner-sm" /> : 'Track'}
+          <button type="submit" className="btn btn-primary btn-sm" disabled={loading || !trackingId.trim()}>
+            {loading ? 'Searching...' : 'Track'}
           </button>
         </form>
 
@@ -98,44 +119,45 @@ export default function TrackGrievancePage({ navigate }) {
 
         {/* Result */}
         {result && (
-          <div style={{ animation: 'slideUp 0.4s ease' }}>
+          <div>
             {/* Status Hero */}
             <div style={{
-              background: 'var(--bg-card)', border: `1px solid ${STATUS_INFO[result.status]?.color}40`,
-              borderRadius: '20px', padding: '28px', marginBottom: '20px', textAlign: 'center'
+              background: 'var(--bg-card)', border: '1px solid var(--border-color)',
+              borderRadius: '10px', padding: '24px', marginBottom: '16px', textAlign: 'center',
+              boxShadow: 'var(--shadow-sm)'
             }}>
-              <div style={{ fontSize: '3.5rem', marginBottom: '8px' }}>{STATUS_INFO[result.status]?.icon || '📬'}</div>
+              <div style={{ fontSize: '2.5rem', marginBottom: '8px' }}>{STATUS_INFO[result.status]?.icon || '📬'}</div>
               <div style={{
-                display: 'inline-block', padding: '6px 18px', borderRadius: '50px',
-                background: `${STATUS_INFO[result.status]?.color}20`,
-                border: `1px solid ${STATUS_INFO[result.status]?.color}40`,
-                color: STATUS_INFO[result.status]?.color,
-                fontWeight: 700, fontSize: '0.875rem', marginBottom: '12px'
+                display: 'inline-block', padding: '3px 12px', borderRadius: '4px',
+                background: STATUS_INFO[result.status]?.bg || '#EFF6FF',
+                border: `1px solid ${STATUS_INFO[result.status]?.border || '#BFDBFE'}`,
+                color: STATUS_INFO[result.status]?.color || 'var(--primary)',
+                fontWeight: 600, fontSize: '0.8125rem', marginBottom: '8px'
               }}>{result.status?.replace('_', ' ')}</div>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{STATUS_INFO[result.status]?.desc}</p>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', margin: 0 }}>{STATUS_INFO[result.status]?.desc}</p>
             </div>
 
             {/* Progress Stepper */}
             {!['REJECTED', 'ESCALATED'].includes(result.status) && (
-              <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px', marginBottom: '16px' }}>
-                <h3 style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '20px' }}>Resolution Progress</h3>
+              <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '20px', marginBottom: '16px', boxShadow: 'var(--shadow-sm)' }}>
+                <h3 style={{ fontWeight: 600, fontSize: '0.8125rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '16px' }}>Resolution Progress</h3>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative' }}>
-                  <div style={{ position: 'absolute', left: '10%', right: '10%', height: '2px', background: 'var(--border-color)', top: '14px', zIndex: 0 }} />
+                  <div style={{ position: 'absolute', left: '10%', right: '10%', height: '2px', background: 'var(--border-color)', top: '13px', zIndex: 0 }} />
                   {STEPS.map((step, i) => {
                     const stepIndex = STEPS.indexOf(result.status);
                     const isDone = i <= stepIndex;
                     return (
-                      <div key={step} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', zIndex: 1, flex: 1 }}>
+                      <div key={step} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', zIndex: 1, flex: 1 }}>
                         <div style={{
-                          width: '28px', height: '28px', borderRadius: '50%',
-                          background: isDone ? 'linear-gradient(135deg, var(--primary), var(--accent))' : 'var(--bg-secondary)',
+                          width: '26px', height: '26px', borderRadius: '50%',
+                          background: isDone ? 'var(--primary)' : 'var(--bg-secondary)',
                           border: `2px solid ${isDone ? 'var(--primary)' : 'var(--border-color)'}`,
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           transition: 'var(--transition)'
                         }}>
-                          {isDone ? <CheckCircle size={14} color="white" /> : <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--border-color)' }} />}
+                          {isDone ? <CheckCircle size={13} color="white" /> : <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--border-color)' }} />}
                         </div>
-                        <span style={{ fontSize: '0.65rem', color: isDone ? 'var(--text-primary)' : 'var(--text-muted)', fontWeight: isDone ? 600 : 400, textAlign: 'center', lineHeight: 1.2 }}>
+                        <span style={{ fontSize: '0.6875rem', color: isDone ? 'var(--text-primary)' : 'var(--text-muted)', fontWeight: isDone ? 600 : 400, textAlign: 'center', lineHeight: 1.2 }}>
                           {step.replace('_', ' ')}
                         </span>
                       </div>
@@ -146,7 +168,7 @@ export default function TrackGrievancePage({ navigate }) {
             )}
 
             {/* Details */}
-            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '20px' }}>
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '16px', boxShadow: 'var(--shadow-sm)' }}>
               {[
                 { label: 'Tracking ID', value: <span className="font-mono">{result.trackingId}</span> },
                 { label: 'Title', value: result.title },
@@ -159,21 +181,21 @@ export default function TrackGrievancePage({ navigate }) {
               ].map(r => (
                 <div key={r.label} className="info-row">
                   <span className="label">{r.label}</span>
-                  <span style={{ fontSize: '0.875rem' }}>{r.value}</span>
+                  <span style={{ fontSize: '0.8125rem' }}>{r.value}</span>
                 </div>
               ))}
             </div>
 
             {result.resolutionNote && (
-              <div style={{ background: 'rgba(0,212,170,0.08)', border: '1px solid rgba(0,212,170,0.3)', borderRadius: '14px', padding: '16px', marginTop: '14px' }}>
-                <div style={{ fontWeight: 700, fontSize: '0.8rem', color: '#00D4AA', marginBottom: '6px' }}>✅ Resolution Note</div>
-                <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{result.resolutionNote}</p>
+              <div style={{ background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: '8px', padding: '14px', marginTop: '14px' }}>
+                <div style={{ fontWeight: 600, fontSize: '0.8125rem', color: '#065F46', marginBottom: '4px' }}>✓ Official Resolution Note</div>
+                <p style={{ fontSize: '0.8125rem', color: '#065F46', margin: 0, lineHeight: 1.5 }}>{result.resolutionNote}</p>
               </div>
             )}
 
-            <div style={{ display: 'flex', gap: '12px', marginTop: '20px', justifyContent: 'center', flexWrap: 'wrap' }}>
-              <button className="btn btn-primary" onClick={() => navigate('#login')}>Sign In to View Full Details</button>
-              <button className="btn btn-secondary" onClick={() => navigate('#register')}>Register Account</button>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '20px', justifyContent: 'center', flexWrap: 'wrap' }}>
+              <button className="btn btn-primary btn-sm" onClick={() => navigate('#login')}>Sign In to View Full Details</button>
+              <button className="btn btn-secondary btn-sm" onClick={() => navigate('#register')}>Register Account</button>
             </div>
           </div>
         )}
