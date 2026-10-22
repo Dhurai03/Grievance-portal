@@ -131,7 +131,7 @@ function AppContent() {
           );
         }
         return (
-          <AppLayout navigate={navigate} activeTab="#admin/dashboard">
+          <AppLayout navigate={navigate} activeTab={`#admin/${route.sub || 'dashboard'}`}>
             <AdminDashboard navigate={navigate} route={route} />
           </AppLayout>
         );

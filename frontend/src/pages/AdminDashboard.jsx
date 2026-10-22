@@ -9,8 +9,18 @@ import {
 
 export default function AdminDashboard({ navigate, route }) {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState(route?.sub || 'analytics');
+  const getNormalizedTab = (sub) => {
+    if (!sub || sub === 'dashboard') return 'analytics';
+    return sub;
+  };
+  const [activeTab, setActiveTab] = useState(() => getNormalizedTab(route?.sub));
   const [loading, setLoading] = useState(true);
+
+  // Sync activeTab whenever route.sub changes (e.g. from sidebar clicks)
+  useEffect(() => {
+    const nextTab = getNormalizedTab(route?.sub);
+    setActiveTab(prev => (nextTab && nextTab !== prev ? nextTab : prev));
+  }, [route?.sub]);
 
   // Data states
   const [overview, setOverview] = useState(null);
@@ -146,7 +156,10 @@ export default function AdminDashboard({ navigate, route }) {
         ].map(tab => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => {
+              setActiveTab(tab.id);
+              navigate(`#admin/${tab.id}`);
+            }}
             className={`admin-tab-btn${activeTab === tab.id ? ' active' : ''}`}
           >
             <tab.icon size={15} />
