@@ -199,7 +199,7 @@ Open **[http://localhost:5173](http://localhost:5173)** in your browser!
 | **Admin** | `admin@college.edu` | `admin123` | Departments & SLA setup, user roles, audit trail |
 
 ---
-
+  
 ## 🛡️ License
 
 Built for college campus grievance redressal and transparent student welfare administration.
