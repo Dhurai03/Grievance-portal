@@ -10,7 +10,7 @@ const CATEGORIES = [
   'Academic Affairs', 'Hostel & Accommodation', 'Library',
   'IT & Technical Support', 'Finance & Fees', 'Student Welfare & Counseling',
   'Sports & Extracurricular', 'Transportation', 'Canteen & Food Services',
-  'Placement & Career Services', 'Ragging & Discipline', 'Faculty & Teaching Quality'
+  'Placement & Career Services', 'Ragging & Discipline', 'Faculty & Teaching Quality' 
 ];
 
 export default function SubmitGrievancePage({ navigate }) {
