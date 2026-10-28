@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import api from '../services/api';
+import api, { UPLOADS_BASE } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import {
   ArrowLeft, Clock, User, Building2, Tag, Send, Star,
@@ -193,7 +193,7 @@ export default function GrievanceDetailPage({ navigate, id }) {
                   </h4>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     {grievance.attachments.map((a, i) => (
-                      <a key={i} href={`/uploads/${a.filename}`} target="_blank" rel="noreferrer"
+                      <a key={i} href={`${UPLOADS_BASE}/${a.filename}`} target="_blank" rel="noreferrer"
                         style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 10px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--primary)', textDecoration: 'none', fontSize: '0.8125rem' }}>
                         <Paperclip size={13} /> {a.originalName}
                         <span style={{ color: 'var(--text-muted)', fontSize: '0.6875rem', marginLeft: 'auto' }}>{(a.size / 1024).toFixed(0)} KB</span>

@@ -254,6 +254,7 @@ def analyze_all(req: AnalyzeAllRequest):
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.environ.get("AI_PORT", 5001))
-    print(f"[AI Service] Starting EduGrieve AI Microservice on http://127.0.0.1:{port}")
-    uvicorn.run(app, host="127.0.0.1", port=port, log_level="info")
+    port = int(os.environ.get("PORT", os.environ.get("AI_PORT", 5001)))
+    host = os.environ.get("HOST", "0.0.0.0")
+    print(f"[AI Service] Starting EduGrieve AI Microservice on http://{host}:{port}")
+    uvicorn.run(app, host=host, port=port, log_level="info")

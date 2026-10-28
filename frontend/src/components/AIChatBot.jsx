@@ -4,6 +4,7 @@ import {
   ChevronDown, ArrowRight, CheckCircle2, Bot, User,
   Clock, ShieldAlert, FileText, Search
 } from 'lucide-react';
+import { API_BASE } from '../services/api';
 
 export default function AIChatBot({ navigate }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -55,7 +56,7 @@ export default function AIChatBot({ navigate }) {
 
     try {
       const activeToken = localStorage.getItem('token');
-      const res = await fetch('/api/ai/chat', {
+      const res = await fetch(`${API_BASE}/ai/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

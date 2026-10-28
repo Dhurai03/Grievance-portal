@@ -1,4 +1,6 @@
-const API_BASE = '/api';
+const BACKEND_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+export const API_BASE = `${BACKEND_URL}/api`;
+export const UPLOADS_BASE = `${BACKEND_URL}/uploads`;
 
 const getAuthHeaders = () => {
   const token = localStorage.getItem('token');
