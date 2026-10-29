@@ -63,9 +63,18 @@ async function seedData() {
     }
 
     if (userData.role === 'officer') {
-      if (userData.email.includes('academic')) user.assignedDepartment = deptMap['ACAD']?._id;
-      if (userData.email.includes('hostel')) user.assignedDepartment = deptMap['HSTL']?._id;
-      if (userData.email.includes('it')) user.assignedDepartment = deptMap['IT']?._id;
+      let deptCode = null;
+      if (userData.email.includes('academic')) deptCode = 'ACAD';
+      if (userData.email.includes('hostel')) deptCode = 'HSTL';
+      if (userData.email.includes('it')) deptCode = 'IT';
+
+      if (deptCode && deptMap[deptCode]) {
+        user.assignedDepartment = deptMap[deptCode]._id;
+        await Department.findByIdAndUpdate(deptMap[deptCode]._id, {
+          $set: { head: user._id },
+          $addToSet: { officers: user._id }
+        });
+      }
     }
 
     await user.save();

@@ -1,5 +1,6 @@
 const Grievance = require('../models/Grievance');
 const Department = require('../models/Department');
+const User = require('../models/User');
 const Notification = require('../models/Notification');
 const AuditLog = require('../models/AuditLog');
 const { classifyGrievance, findSimilarGrievances } = require('../services/aiClassifier');
@@ -36,14 +37,32 @@ exports.submitGrievance = async (req, res) => {
     // 1. AI Classification & Urgency (TF-IDF + Logistic Regression & Supervised Urgency Classifier)
     const aiResult = await classifyGrievance(fullText);
 
-    // Find department from AI result or category
-    const departmentName = aiResult.department;
+    // Find department from AI result or user-selected category
+    const searchTerms = [category, aiResult.department].filter(Boolean);
     const dept = await Department.findOne({
       $or: [
-        { name: new RegExp(departmentName, 'i') },
-        { code: aiResult.departmentCode || '' }
+        ...searchTerms.map(t => ({ name: new RegExp(`^${t}$`, 'i') })),
+        ...searchTerms.map(t => ({ name: new RegExp(t, 'i') })),
+        { code: (aiResult.departmentCode || '').toUpperCase() }
       ]
     });
+
+    // Auto-assign to designated department officer
+    let assignedOfficer = null;
+    if (dept) {
+      if (dept.head) {
+        assignedOfficer = await User.findById(dept.head);
+      } else if (dept.officers && dept.officers.length > 0) {
+        assignedOfficer = await User.findById(dept.officers[0]);
+      }
+
+      if (!assignedOfficer) {
+        assignedOfficer = await User.findOne({
+          role: 'officer',
+          assignedDepartment: dept._id
+        });
+      }
+    }
 
     // 2. Duplicate & Similar Grievance Detection (Sentence Transformers + Cosine Similarity)
     let similarityResult = { matches: [], totalMatches: 0, hasDuplicate: false };
@@ -78,6 +97,7 @@ exports.submitGrievance = async (req, res) => {
       category: category || aiResult.category,
       subcategory: subcategory || aiResult.subcategory,
       department: dept?._id || null,
+      assignedTo: assignedOfficer?._id || null,
       submittedBy: req.user._id,
       isAnonymous: isAnonymous === 'true' || isAnonymous === true,
       priority,
@@ -107,15 +127,15 @@ exports.submitGrievance = async (req, res) => {
           isDuplicate: m.isDuplicate
         }))
       },
-      isAiRouted: aiResult.isAiRouted,
+      isAiRouted: Boolean(dept),
       slaDeadline: computeSlaDeadline(priority, dept),
       history: [{
         previousStatus: null,
         newStatus: 'SUBMITTED',
         changedBy: req.user._id,
-        remarks: similarityResult.hasDuplicate
-          ? `Grievance submitted. Flagged: high similarity to existing ticket [${similarityResult.topMatch?.trackingId}].`
-          : 'Grievance submitted successfully.'
+        remarks: assignedOfficer
+          ? `Grievance submitted, auto-routed to ${dept.name} and auto-assigned to ${assignedOfficer.name}.`
+          : (dept ? `Grievance submitted and auto-routed to ${dept.name}.` : 'Grievance submitted successfully.')
       }]
     });
 
@@ -132,7 +152,8 @@ exports.submitGrievance = async (req, res) => {
       targetId: grievance._id,
       metadata: {
         trackingId: grievance.trackingId,
-        department: departmentName,
+        department: dept?.name || departmentName,
+        assignedTo: assignedOfficer?.name || null,
         urgency: priority,
         hasDuplicate: similarityResult.hasDuplicate
       }
@@ -143,27 +164,42 @@ exports.submitGrievance = async (req, res) => {
       req.user._id,
       'GRIEVANCE_SUBMITTED',
       '✅ Grievance Submitted',
-      `Your grievance "${title}" has been registered. Tracking ID: ${grievance.trackingId}${similarityResult.hasDuplicate ? ' (Related active complaint recognized by AI)' : ''}`,
+      `Your grievance "${title}" has been registered and auto-routed to ${dept?.name || 'Department'}. Tracking ID: ${grievance.trackingId}${similarityResult.hasDuplicate ? ' (Related active complaint recognized by AI)' : ''}`,
       grievance._id,
       `#grievance/detail/${grievance._id}`
     );
 
-    // Notify department officers
+    // Notify assigned officer directly
+    if (assignedOfficer) {
+      await createNotification(
+        assignedOfficer._id,
+        'GRIEVANCE_ASSIGNED',
+        '📋 New Grievance Auto-Assigned',
+        `A new ${priority} priority grievance has been auto-routed and assigned to you: "${title}"${similarityResult.hasDuplicate ? ' (⚠️ AI Duplicate Flag)' : ''}`,
+        grievance._id,
+        `#officer/grievance/${grievance._id}`
+      );
+    }
+
+    // Also notify department officers list if present
     if (dept?.officers?.length > 0) {
       for (const officerId of dept.officers) {
-        await createNotification(
-          officerId,
-          'GRIEVANCE_ASSIGNED',
-          '📋 New Grievance in Your Department',
-          `A new ${priority} priority grievance has been submitted: "${title}"${similarityResult.hasDuplicate ? ' (⚠️ AI Duplicate Flag)' : ''}`,
-          grievance._id,
-          `#officer/grievance/${grievance._id}`
-        );
+        if (!assignedOfficer || officerId.toString() !== assignedOfficer._id.toString()) {
+          await createNotification(
+            officerId,
+            'GRIEVANCE_ASSIGNED',
+            '📋 New Grievance in Your Department',
+            `A new ${priority} priority grievance has been submitted: "${title}"${similarityResult.hasDuplicate ? ' (⚠️ AI Duplicate Flag)' : ''}`,
+            grievance._id,
+            `#officer/grievance/${grievance._id}`
+          );
+        }
       }
     }
 
     const populated = await Grievance.findById(grievance._id)
       .populate('department', 'name code')
+      .populate('assignedTo', 'name email designation')
       .populate('submittedBy', 'name email studentId');
 
     res.status(201).json({
