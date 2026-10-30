@@ -68,8 +68,8 @@ export default function SubmitGrievancePage({ navigate }) {
       if (c) {
         setForm(p => ({
           ...p,
-          category: p.category || c.category,
-          subcategory: p.subcategory || c.subcategory || ''
+          category: c.category || p.category,
+          subcategory: c.subcategory || p.subcategory || ''
         }));
       }
     } catch (_) {}

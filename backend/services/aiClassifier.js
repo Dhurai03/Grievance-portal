@@ -128,6 +128,34 @@ const COLLEGE_RULES = [
     priority: 'CRITICAL',
     keywords: ['ragging', 'rag', 'seniors', 'bully', 'bully by senior', 'abuse', 'threat', 'intimidation', 'force', 'humiliation', 'misbehavior', 'misconduct'],
     boostKeywords: { 'physical': 'CRITICAL', 'sexual': 'CRITICAL', 'mental torture': 'CRITICAL' }
+  },
+  // ─── Infrastructure & Safety Hazards ───────────────────────────────────────
+  {
+    category: 'Student Welfare & Counseling',
+    subcategory: 'Campus Safety & Infrastructure',
+    department: 'Student Welfare & Counseling',
+    departmentCode: 'WELF',
+    priority: 'CRITICAL',
+    keywords: [
+      'exposed wire', 'electrical wire', 'bare wire', 'live wire', 'electric shock',
+      'short circuit', 'electrical hazard', 'power failure', 'switchboard', 'electrical fault',
+      'gas leak', 'fire hazard', 'fire breakout', 'flooding', 'roof collapse', 'ceiling collapse',
+      'broken glass', 'sharp object', 'unsafe building', 'cracked wall', 'structural damage',
+      'chemical spill', 'toxic', 'fumes', 'hazard', 'unsafe', 'dangerous', 'emergency',
+      'urgent repair', 'immediate danger', 'physical danger', 'injured', 'accident',
+      'maintenance emergency', 'infrastructure', 'facility damage'
+    ],
+    boostKeywords: {
+      'injure': 'CRITICAL',
+      'injured': 'CRITICAL',
+      'shock': 'CRITICAL',
+      'fire': 'CRITICAL',
+      'collapse': 'CRITICAL',
+      'danger': 'CRITICAL',
+      'emergency': 'CRITICAL',
+      'immediate': 'CRITICAL',
+      'hospital': 'CRITICAL'
+    }
   }
 ];
 
@@ -205,27 +233,58 @@ function classifyByKeywords(text) {
  */
 function estimateUrgencyFallback(text) {
   const clean = (text || '').toLowerCase();
-  if (clean.includes('ragging') || clean.includes('suicide') || clean.includes('poison') || clean.includes('fire') || clean.includes('assault') || clean.includes('emergency')) {
+
+  // ── CRITICAL: Physical safety, life-threatening, immediate danger ─────────
+  const criticalPatterns = [
+    'ragging', 'suicide', 'self harm', 'assault', 'violence', 'sexual',
+    // Fire & electrical hazards
+    'fire', 'electrical wire', 'exposed wire', 'bare wire', 'live wire', 'electric shock',
+    'short circuit', 'electrical hazard', 'electrical fault', 'sparking', 'burning smell',
+    // Structural / environmental
+    'gas leak', 'roof collapse', 'ceiling collapse', 'wall crack', 'structural',
+    'flooding', 'chemical spill', 'toxic fumes', 'hazardous',
+    // Medical / injury
+    'injured', 'injury', 'accident', 'hospital', 'unconscious', 'bleeding',
+    // General safety
+    'emergency', 'immediate danger', 'physical danger', 'life risk', 'unsafe building',
+    'could be injured', 'someone could', 'people could', 'students could',
+    'poison', 'poisoning', 'food poisoning'
+  ];
+  if (criticalPatterns.some(p => clean.includes(p))) {
     return {
       urgency: 'CRITICAL',
-      confidence: 0.85,
-      urgencyScore: 0.95,
+      confidence: 0.90,
+      urgencyScore: 0.97,
       flagForImmediateReview: true,
       recommendedSlaHours: 24,
       technique: 'Rule-based Urgency Fallback'
     };
   }
-  if (clean.includes('deadline') || clean.includes('hall ticket') || clean.includes('revaluation') || clean.includes('no water') || clean.includes('harass') || clean.includes('today')) {
+
+  // ── HIGH: Urgent academic/financial deadlines, welfare issues ─────────────
+  const highPatterns = [
+    'deadline', 'hall ticket', 'revaluation', 'no water', 'harass', 'today',
+    'no electricity', 'power cut', 'broken', 'dangerous', 'hazard',
+    'urgent', 'immediately', 'asap', 'critical issue', 'not working for days',
+    'exam tomorrow', 'submission today'
+  ];
+  if (highPatterns.some(p => clean.includes(p))) {
     return {
       urgency: 'HIGH',
-      confidence: 0.75,
-      urgencyScore: 0.78,
+      confidence: 0.78,
+      urgencyScore: 0.80,
       flagForImmediateReview: true,
       recommendedSlaHours: 48,
       technique: 'Rule-based Urgency Fallback'
     };
   }
-  if (clean.includes('suggest') || clean.includes('magazine') || clean.includes('cricket') || clean.includes('bean bag') || clean.includes('plant') || clean.includes('font')) {
+
+  // ── LOW: Suggestions, minor cosmetic/convenience requests ─────────────────
+  const lowPatterns = [
+    'suggest', 'suggestion', 'magazine', 'cricket', 'bean bag', 'plant',
+    'font', 'colour', 'color', 'decoration', 'nice to have', 'minor'
+  ];
+  if (lowPatterns.some(p => clean.includes(p))) {
     return {
       urgency: 'LOW',
       confidence: 0.65,
@@ -235,6 +294,8 @@ function estimateUrgencyFallback(text) {
       technique: 'Rule-based Urgency Fallback'
     };
   }
+
+  // ── MEDIUM: Default ───────────────────────────────────────────────────────
   return {
     urgency: 'MEDIUM',
     confidence: 0.60,

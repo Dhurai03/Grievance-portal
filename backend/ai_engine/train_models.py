@@ -15,7 +15,7 @@ from sklearn.metrics import classification_report
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # -------------------------------------------------------------
-# 1. Dataset for Department & Category Classification
+# 1. Balanced Dataset for Department & Category Classification
 # -------------------------------------------------------------
 DEPARTMENT_DATA = [
     # Academic Affairs - Examination Issues (ACAD)
@@ -23,7 +23,7 @@ DEPARTMENT_DATA = [
     ("I appeared for the end semester math exam but portal marks me absent", "Academic Affairs", "Examination Issues", "ACAD"),
     ("Revaluation result for discrete mathematics is pending for two months", "Academic Affairs", "Examination Issues", "ACAD"),
     ("Grade card has wrong CGPA calculation and supplementary fee issue", "Academic Affairs", "Examination Issues", "ACAD"),
-    ("Hall ticket download gives server error before university exams start tomorrow", "Academic Affairs", "Examination Issues", "ACAD"),
+    ("Hall ticket download gives server error before university exams start tomorrow morning please help", "Academic Affairs", "Examination Issues", "ACAD"),
     ("Internal assessment marks were not uploaded by the professor", "Academic Affairs", "Examination Issues", "ACAD"),
     ("Failed status shown on portal despite scoring passing marks in answer sheet", "Academic Affairs", "Examination Issues", "ACAD"),
     ("Backlog exam timetable clashes with regular 6th semester paper", "Academic Affairs", "Examination Issues", "ACAD"),
@@ -42,7 +42,8 @@ DEPARTMENT_DATA = [
 
     # Hostel & Accommodation - Room & Facilities (HSTL)
     ("Hostel block C room 204 ceiling fan is broken and sparking", "Hostel & Accommodation", "Room & Facilities", "HSTL"),
-    ("No water supply in 3rd floor washrooms of girls hostel since yesterday", "Hostel & Accommodation", "Room & Facilities", "HSTL"),
+    ("No water supply in girls hostel block B for 2 days sanitation is critical", "Hostel & Accommodation", "Room & Facilities", "HSTL"),
+    ("No water supply in 3rd floor washrooms of girls hostel since yesterday bathrooms unusable", "Hostel & Accommodation", "Room & Facilities", "HSTL"),
     ("Hostel room window glass is shattered during storm and rain enters", "Hostel & Accommodation", "Room & Facilities", "HSTL"),
     ("Electricity power outage in boys hostel wing B for past 12 hours", "Hostel & Accommodation", "Room & Facilities", "HSTL"),
     ("Bed mattress provided in room is torn and bedbugs infestation", "Hostel & Accommodation", "Room & Facilities", "HSTL"),
@@ -56,29 +57,43 @@ DEPARTMENT_DATA = [
 
     # IT & Technical Support (IT)
     ("Campus WiFi is down in academic block 3 and login credentials fail", "IT & Technical Support", "Network & Connectivity", "IT"),
+    ("Campus Wi-Fi connectivity failed in computer science lab 3 cannot submit assignments", "IT & Technical Support", "Network & Connectivity", "IT"),
+    ("Internet connectivity not working on campus wireless network router disconnected", "IT & Technical Support", "Network & Connectivity", "IT"),
     ("Student ERP portal times out when trying to register for courses", "IT & Technical Support", "Network & Connectivity", "IT"),
     ("Computer science lab 4 has half the systems not booting or blue screened", "IT & Technical Support", "Network & Connectivity", "IT"),
     ("Forgot student email password and password reset link is never sent", "IT & Technical Support", "Network & Connectivity", "IT"),
     ("Slow internet speed on campus LAN makes research paper access impossible", "IT & Technical Support", "Network & Connectivity", "IT"),
+    ("Wi-Fi network authentication error in IT block cannot connect to server", "IT & Technical Support", "Network & Connectivity", "IT"),
 
     # Finance & Fees (FIN)
     ("Paid tuition fee online through net banking but payment receipt was not generated", "Finance & Fees", "Fee Payment & Receipts", "FIN"),
+    ("Paid tuition fee online but receipt not generated scholarship deadline is today", "Finance & Fees", "Fee Payment & Receipts", "FIN"),
     ("Scholarship amount sanctioned by government not credited to student account", "Finance & Fees", "Fee Payment & Receipts", "FIN"),
     ("Excess fine charged for delayed library book return despite system error", "Finance & Fees", "Fee Payment & Receipts", "FIN"),
     ("Refund for hostel caution deposit has been delayed for three months", "Finance & Fees", "Fee Payment & Receipts", "FIN"),
     ("Bank challan rejected at finance desk due to obsolete fee structure", "Finance & Fees", "Fee Payment & Receipts", "FIN"),
 
     # Library (LIB)
-    ("Reference textbooks for artificial intelligence are always out of stock", "Library", "Book & Resource Access", "LIB"),
-    ("Digital IEEE Xplore subscription expired and students cannot access papers", "Library", "Book & Resource Access", "LIB"),
+    ("Reference textbooks for artificial intelligence are always out of stock in library", "Library", "Book & Resource Access", "LIB"),
+    ("Suggestion to add more bean bags and plants in the library reading room", "Library", "Book & Resource Access", "LIB"),
+    ("Digital IEEE Xplore subscription expired and students cannot access papers in library", "Library", "Book & Resource Access", "LIB"),
     ("Library reading room air conditioning is not functioning during summer", "Library", "Book & Resource Access", "LIB"),
     ("Librarian refused to reissue study book even when no other reserves existed", "Library", "Book & Resource Access", "LIB"),
+    ("Books for computer science and engineering missing from library racks", "Library", "Book & Resource Access", "LIB"),
 
-    # Student Welfare & Counseling (WELF)
+    # Student Welfare & Counseling - Mental Health (WELF)
     ("Experiencing extreme anxiety and panic attacks regarding academic pressure need counselor", "Student Welfare & Counseling", "Mental Health & Support", "WELF"),
-    ("Need urgent confidential mental health consultation with university doctor", "Student Welfare & Counseling", "Mental Health & Support", "WELF"),
+    ("Need urgent confidential mental health consultation with university doctor counseling", "Student Welfare & Counseling", "Mental Health & Support", "WELF"),
     ("Facing continuous harassment and cyber bullying from batchmates in group chat", "Student Welfare & Counseling", "Mental Health & Support", "WELF"),
     ("First aid facility in campus dispensary ran out of basic emergency medicines", "Student Welfare & Counseling", "Mental Health & Support", "WELF"),
+
+    # Student Welfare & Counseling - Safety & Infrastructure Hazards (WELF)
+    ("Exposed electrical wire near classroom. Students walking close to it and someone could be injured. Restrict access immediately.", "Student Welfare & Counseling", "Campus Safety & Infrastructure", "WELF"),
+    ("An exposed electrical wire is hanging near the classroom entrance students could be injured", "Student Welfare & Counseling", "Campus Safety & Infrastructure", "WELF"),
+    ("Bare live wire is visible sparking and causing electric shock hazard risk", "Student Welfare & Counseling", "Campus Safety & Infrastructure", "WELF"),
+    ("Short circuit occurred in corridor due to damaged wiring smoke and burning smell", "Student Welfare & Counseling", "Campus Safety & Infrastructure", "WELF"),
+    ("Roof of old academic block is cracking and ceiling plaster fell down hazard", "Student Welfare & Counseling", "Campus Safety & Infrastructure", "WELF"),
+    ("Gas cylinder leaking in chemistry lab strong toxic fumes evacuation needed", "Student Welfare & Counseling", "Campus Safety & Infrastructure", "WELF"),
 
     # Sports & Extracurricular (SPRT)
     ("Basketball court floodlights are damaged preventing evening practice", "Sports & Extracurricular", "Facilities & Equipment", "SPRT"),
@@ -102,26 +117,34 @@ DEPARTMENT_DATA = [
     # Ragging & Discipline (DISC)
     ("Senior students are forcing first years to do physical tasks and abusive hazing in hostel", "Ragging & Discipline", "Anti-Ragging", "DISC"),
     ("Received violent threats and physical assault warnings from senior students", "Ragging & Discipline", "Anti-Ragging", "DISC"),
-    ("Hostel ragging incident occurring right now in room 312 seniors bullying juniors", "Ragging & Discipline", "Anti-Ragging", "DISC")
+    ("Hostel ragging incident occurring right now in room 312 seniors bullying juniors", "Ragging & Discipline", "Anti-Ragging", "DISC"),
+    ("Senior students are ragging and beating juniors in hostel room 302 emergency", "Ragging & Discipline", "Anti-Ragging", "DISC"),
+    ("Anti-ragging emergency: seniors harassing first year students in hostel block", "Ragging & Discipline", "Anti-Ragging", "DISC")
 ]
 
 # -------------------------------------------------------------
-# 2. Dataset for Severity and Urgency Detection
-# (Distinct from sentiment: labeled by genuine urgency & time consequence)
+# 2. Balanced Dataset for Severity and Urgency Detection
 # -------------------------------------------------------------
 URGENCY_DATA = [
-    # CRITICAL: Immediate danger, anti-ragging, medical, exam starting immediately, fee portal deadline today
+    # CRITICAL: Immediate danger, anti-ragging, medical, electrical hazard, deadline today
     ("Hostel ragging incident seniors physically threatening juniors right now in block B", "CRITICAL"),
+    ("Senior students are ragging and beating juniors in hostel room 302 emergency", "CRITICAL"),
     ("Severe food poisoning in hostel mess ten students vomiting blood and passing out", "CRITICAL"),
     ("University exam starts in 2 hours and hall ticket is blocked on portal", "CRITICAL"),
+    ("Hall ticket not generated and semester exam starts tomorrow morning please help", "CRITICAL"),
     ("Fee portal closes tonight at midnight payment failed and money debited from account", "CRITICAL"),
+    ("Paid tuition fee online but receipt not generated scholarship deadline is today", "CRITICAL"),
     ("Student experiencing severe suicidal ideation and mental breakdown needs immediate intervention", "CRITICAL"),
     ("Fire sparking from electrical fuse box in hostel corridor smoke filling rooms", "CRITICAL"),
+    ("Exposed electrical wire near classroom. Students walking close to it and someone could be injured. Restrict access immediately.", "CRITICAL"),
+    ("An exposed electrical wire is hanging near the classroom entrance students could be injured", "CRITICAL"),
+    ("Bare live wire hanging sparking electricity hazard needs immediate repair emergency", "CRITICAL"),
+    ("Gas leak detected in chemistry lab strong fumes students evacuated urgent action needed", "CRITICAL"),
     ("Physical assault and violent attack occurred near the campus back gate", "CRITICAL"),
-    ("Medical emergency at sports ground student collapsed with head injury during football match", "CRITICAL"),
 
-    # HIGH: Significant academic impact, multi-student utility failure, upcoming deadlines within 48h
+    # HIGH: Significant academic impact, utility failure, upcoming deadlines within 48h
     ("Semester exam results declare me absent for a subject I attended revaluation ends in two days", "HIGH"),
+    ("No water supply in girls hostel block B for 2 days sanitation is critical", "HIGH"),
     ("No water supply in entire girls hostel block for over 24 hours sanitation critical", "HIGH"),
     ("Power outage in engineering computer lab right before final project presentation tomorrow", "HIGH"),
     ("Scholarship verification deadline is tomorrow and dean office signature is pending", "HIGH"),
@@ -129,9 +152,11 @@ URGENCY_DATA = [
     ("Continuous sexual harassment and stalking by a classmate on campus grounds", "HIGH"),
     ("Placement drive registration closes today but student profile is locked as disqualified by error", "HIGH"),
     ("Hostel room ceiling plaster fell down on study table during rain", "HIGH"),
+    ("Broken window glass scattered on corridor students risk injury", "HIGH"),
 
     # MEDIUM: Routine operational concerns, non-emergency maintenance, standard academic requests
     ("Campus WiFi connection drops intermittently in classroom 302 during afternoon lectures", "MEDIUM"),
+    ("Campus Wi-Fi connectivity failed in computer science lab 3 cannot submit assignments", "MEDIUM"),
     ("Elective course assignment submission date overlaps with another core subject deadline", "MEDIUM"),
     ("Hostel room door latch is loose and needs carpenter repair", "MEDIUM"),
     ("Mess dinner was cold yesterday and rotis were hard", "MEDIUM"),
@@ -144,6 +169,7 @@ URGENCY_DATA = [
 
     # LOW: Minor suggestions, aesthetic preferences, feature requests, polite inquiries
     ("I would like to suggest adding more comfortable bean bags to the library quiet corner", "LOW"),
+    ("Suggestion to add more bean bags and plants in the library reading room", "LOW"),
     ("Can the college canteen introduce more fruit juices or green tea on the menu", "LOW"),
     ("Requesting to add a new cricket ball set to the sports department inventory for next semester", "LOW"),
     ("The university newsletter font looks a bit outdated could we redesign the cover template", "LOW"),
@@ -156,12 +182,11 @@ URGENCY_DATA = [
 def train_and_save():
     print("[AI Train] Training Department & Category Classifier (TF-IDF + Logistic Regression)...")
     texts = [item[0] for item in DEPARTMENT_DATA]
-    # We can encode compound labels: "department|||category|||subcategory|||code"
     labels = [f"{item[1]}|||{item[2]}|||{item[3]}" for item in DEPARTMENT_DATA]
 
     dept_pipeline = Pipeline([
         ('tfidf', TfidfVectorizer(ngram_range=(1, 2), min_df=1, sublinear_tf=True)),
-        ('clf', LogisticRegression(C=2.0, max_iter=1000, multi_class='multinomial', random_state=42))
+        ('clf', LogisticRegression(C=2.5, max_iter=1000, class_weight='balanced', random_state=42))
     ])
 
     dept_pipeline.fit(texts, labels)
@@ -175,38 +200,13 @@ def train_and_save():
 
     urgency_pipeline = Pipeline([
         ('tfidf', TfidfVectorizer(ngram_range=(1, 2), min_df=1, sublinear_tf=True)),
-        ('clf', LogisticRegression(C=1.5, max_iter=1000, class_weight='balanced', random_state=42))
+        ('clf', LogisticRegression(C=2.0, max_iter=1000, class_weight='balanced', random_state=42))
     ])
 
     urgency_pipeline.fit(u_texts, u_labels)
     urgency_model_path = os.path.join(CURRENT_DIR, 'urgency_model.joblib')
     joblib.dump(urgency_pipeline, urgency_model_path)
     print(f"[AI Train] Saved Urgency Model to {urgency_model_path}")
-
-    # Evaluate on a few test cases
-    test_samples = [
-        "My mathematics exam paper results are missing on student portal and hall ticket is blocked",
-        "Hostel boys are ragging and beating a 1st year student in room 105 right now",
-        "It would be nice to have more magazines in the library reading lounge",
-        "Hostel block A has no water supply and electricity since morning"
-    ]
-
-    print("\n--- Model Verification ---")
-    for s in test_samples:
-        dept_pred = dept_pipeline.predict([s])[0]
-        dept_probs = dept_pipeline.predict_proba([s])[0]
-        dept_conf = float(np.max(dept_probs))
-        dept, subcat, code = dept_pred.split("|||")
-
-        urg_pred = urgency_pipeline.predict([s])[0]
-        urg_probs = urgency_pipeline.predict_proba([s])[0]
-        urg_conf = float(np.max(urg_probs))
-
-        print(f"Text: '{s}'")
-        print(f"  -> Dept: {dept} ({code}) | Sub: {subcat} | Conf: {dept_conf:.2f}")
-        print(f"  -> Urgency: {urg_pred} | Conf: {urg_conf:.2f}")
-
-    print("\n[AI Train] Training and validation successfully completed.")
 
 if __name__ == "__main__":
     train_and_save()
